@@ -23,6 +23,9 @@
             if (pushToHistory) {
                 history.pushState({ viewId: viewId }, "", "#" + viewId);
             }
+
+            // AI 업로드 화면 진입 시 목록 로드
+            if (viewId === 'view-ai-upload') loadCriteriaList();
         }
 
         // 🌟 [추가] 3. 브라우저 뒤로가기/앞으로가기 이벤트(popstate) 감지 처리
@@ -480,17 +483,82 @@ async function uploadProfessorFile(inputElement) {
 
     try {
         // 우선은 샘플로 1주차 기준 업로드 진행
-        const res = await fetch(`${SERVER_URL}/api/upload-criteria/1`, {
+        // 실제 구현 시 주차 선택 UI가 있다면 해당 값을 사용해야 합니다.
+        const week = prompt("몇 주차 자료인가요? (숫자만 입력)", "1");
+        if (!week) return;
+
+        const response = await fetch(`${SERVER_URL}/api/upload-criteria/${week}`, {
             method: 'POST',
             body: formData // 파일 전송시에는 Headers에 Content-Type을 명시하지 않는 것이 좋습니다 (자동 세팅)
         });
         
-        const data = await res.json();
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || "서버 응답 오류");
+        }
+
+        const data = await response.json();
         alert(`🎉 ${data.message}\n학습된 파일명: ${data.criteria.fileName}`);
         
-        // 성공 후 화면을 새로고침 하거나 목록을 업데이트하는 로직을 추가할 수 있습니다.
+        // 성공 후 목록 업데이트 🌟
+        loadCriteriaList();
     } catch (error) {
         console.error("파일 업로드 실패:", error);
-        alert("파일을 업로드하는 중 오류가 발생했습니다.");
+        alert(`파일 업로드 실패: ${error.message}`);
+    }
+}
+
+// [신규] 업로드된 자료 목록을 가져와서 UI에 표시하는 함수
+async function loadCriteriaList() {
+    const listContainer = document.getElementById('criteria-list-container');
+    if (!listContainer) return;
+
+    try {
+        const res = await fetch(`${SERVER_URL}/api/upload-criteria`);
+        const data = await res.json();
+
+        if (data.length === 0) {
+            listContainer.innerHTML = '<p style="color: #94a3b8; text-align: center;">아직 업로드된 자료가 없습니다.</p>';
+            return;
+        }
+
+        listContainer.innerHTML = data.map(item => `
+            <div style="background: white; padding: 12px 15px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="flex: 1; min-width: 0; display: flex; align-items: center; margin-right: 10px;">
+                    <span style="color: #4f46e5; font-weight: bold; margin-right: 10px; white-space: nowrap;">[${item.week}주차]</span>
+                    <span style="color: #1e293b; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.fileName}">${item.fileName}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; white-space: nowrap;"><i class="fa-solid fa-check"></i> 학습 완료</span>
+                    <button onclick="deleteCriteria('${item._id}')" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; font-size: 0.9rem;" title="삭제">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error("목록 로드 실패:", error);
+    }
+}
+
+// [신규] 업로드된 자료 삭제 함수
+async function deleteCriteria(id) {
+    if (!confirm("이 자료를 삭제하시겠습니까? 삭제 시 해당 주차의 AI 피드백 기준에서 제외됩니다.")) return;
+
+    try {
+        const res = await fetch(`${SERVER_URL}/api/upload-criteria/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (res.ok) {
+            alert("자료가 삭제되었습니다.");
+            loadCriteriaList(); // 목록 새로고침
+        } else {
+            const error = await res.text();
+            alert("삭제 실패: " + error);
+        }
+    } catch (error) {
+        console.error("삭제 중 오류 발생:", error);
+        alert("삭제 작업 중 오류가 발생했습니다.");
     }
 }

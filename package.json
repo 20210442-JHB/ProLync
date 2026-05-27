@@ -18,7 +18,15 @@
     "mongodb": "^7.2.0",
     "mongoose": "^9.6.2",
     "multer": "^2.1.1",
-    "openai": "^6.38.0",
-    "pdf-parse": "^1.1.1"
-  }
+    "openai": "^6.39.0",
+    "pdf-parse": "^1.1.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/20210442-JHB/ProLync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/20210442-JHB/ProLync/issues"
+  },
+  "homepage": "https://github.com/20210442-JHB/ProLync#readme"
 }
