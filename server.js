@@ -1,8 +1,8 @@
-require('dotenv').config(); // .env 파일 읽기
 const { OpenAI } = require('openai');
+require('dotenv').config();
 
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY // 환경변수에서 키 가져오기
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 const express = require('express');
@@ -10,6 +10,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
+// 🌟 [수정 버전] 이렇게 변경해 주세요!
+// 🌟 [최종 대안] 위 코드로 안 될 경우 이 방식으로 작성하세요.
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
 
@@ -81,17 +83,49 @@ const Criteria = mongoose.model('Criteria', CriteriaSchema);
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
-// 1. 사용자 로그인/생성 및 데이터 조회
-app.post('/api/login', async (req, res) => {
-    const { userId, name, role } = req.body;
+
+// 1-1. 회원가입 처리 API (이름, 역할 연동 완료 🌟)
+app.post('/api/signup', async (req, res) => {
+    const { userId, password, name, role } = req.body; 
     try {
-        let user = await User.findOne({ userId });
+        const existingUser = await User.findOne({ userId });
+        if (existingUser) {
+            return res.status(400).json({ message: "이미 존재하는 학번/교번입니다." });
+        }
+
+        const newUser = new User({
+            userId,
+            password, 
+            name: name || "신규 가입자", 
+            role: role || "student", 
+            tokens: role === 'prof' ? 0 : 320 
+        });
+
+        await newUser.save();
+        res.json({ message: "회원가입이 완료되었습니다! 로그인해 주세요." });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send(err.message);
+    }
+});
+
+// 1-2. 사용자 로그인 검증 및 데이터 조회 (업그레이드 버전 🌟)
+app.post('/api/login', async (req, res) => {
+    const { userId, password, role } = req.body;
+    try {
+        const user = await User.findOne({ userId });
         if (!user) {
-            user = new User({ userId, name, role });
-            await user.save();
+            return res.status(401).json({ message: "존재하지 않는 학번 또는 교번입니다." });
+        }
+        if (user.password !== password) {
+            return res.status(401).json({ message: "비밀번호가 일치하지 않습니다." });
+        }
+        if (user.role !== role) {
+            return res.status(403).json({ message: "선택하신 회원 유형(학생/교수)이 일치하지 않습니다." });
         }
         res.json(user);
     } catch (err) {
+        console.error(err);
         res.status(500).send(err.message);
     }
 });
@@ -104,7 +138,7 @@ app.patch('/api/users/:userId/tokens', async (req, res) => {
         const user = await User.findOneAndUpdate(
             { userId },
             { tokens },
-            { new: true, upsert: true } // 사용자가 없으면 생성, 있으면 수정
+            { new: true, upsert: true }
         );
         res.json(user);
     } catch (err) {
@@ -134,33 +168,21 @@ app.get('/api/users/total-tokens', async (req, res) => {
     }
 });
 
-// 2. 특정 주차 보고서 및 피드백 조회
+// 2. 특정 주차 보고서 및 피드백 조회 (중복 제거 및 404 예외 처리 통합 🌟)
 app.get('/api/reports/:week', async (req, res) => {
     try {
         const weekNum = parseInt(req.params.week);
         const report = await Report.findOne({ week: weekNum });
-        res.json(report || {});
-    } catch (err) {
-        res.status(500).send(err.message);
-    }
-});
-
-// 3. 보고서 저장/수정
-app.post('/api/reports', async (req, res) => {
-    const { week, title, content, authorId } = req.body;
-    try {
-        let report = await Report.findOneAndUpdate(
-            { week },
-            { title, content, authorId },
-            { upsert: true, new: true }
-        );
+        if (!report) {
+            return res.status(404).json({ message: "해당 주차의 제출된 보고서가 없습니다." });
+        }
         res.json(report);
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-// [추가] 교수용: 강의자료/루브릭 파일 업로드 및 텍스트 학습 API
+// 3. 교수용: 강의자료/루브릭 파일 업로드 및 텍스트 학습 API
 app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) => {
     try {
         const weekNum = parseInt(req.params.week);
@@ -168,23 +190,28 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
             return res.status(400).send("업로드된 파일이 없습니다.");
         }
 
+        console.log(`[파일 업로드 시작] 파일명: ${req.file.originalname}, 타입: ${req.file.mimetype}`);
         let extractedText = "";
 
-        // 파일 형식에 따른 텍스트 추출 분기 (PDF 예시)
         if (req.file.mimetype === 'application/pdf') {
             const dataBuffer = fs.readFileSync(req.file.path);
-            const pdfData = await pdfParse(dataBuffer);
-            extractedText = pdfData.text; // PDF에서 긁어온 텍스트
-            
-            // 임시 파일 삭제
-            fs.unlinkSync(req.file.path);
+            try {
+                const pdfData = await pdfParse(dataBuffer);
+                extractedText = pdfData.text; 
+            } catch (pdfErr) {
+                console.error("PDF 파싱 중 에러 발생:", pdfErr);
+                throw new Error("PDF 파일 분석에 실패했습니다.");
+            }
+        } else if (req.file.mimetype.includes('spreadsheet') || req.file.originalname.endsWith('.xlsx')) {
+            extractedText = `[엑셀 파일 업로드됨: ${req.file.originalname}] 이 파일은 채점 루브릭 기준으로 사용됩니다.`;
         } else {
-            // 일반 텍스트 파일 등 (.txt, .csv 등) 일 경우
             extractedText = fs.readFileSync(req.file.path, 'utf8');
+        }
+
+        if (fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
 
-        // DB에 주차별로 학습 기준 텍스트 저장 (기존 데이터가 있으면 덮어쓰기)
         const criteria = await Criteria.findOneAndUpdate(
             { week: weekNum },
             { 
@@ -197,32 +224,30 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
 
         res.json({ message: "성공적으로 파일을 학습했습니다.", criteria });
     } catch (err) {
-        console.error(err);
+        console.error("파일 업로드 최종 실패 로그:", err);
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
         res.status(500).send(err.message);
     }
 });
 
-// 4. AI 피드백 생성 (교수용)
-// 4. AI 피드백 생성 (교수용) - 맞춤형 루브릭 반영 버전 🌟
+// 4. AI 피드백 생성 (교수용 수동 재발행 버전)
 app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
     try {
         const weekNum = parseInt(req.params.week);
-        
-        // 1. 학생의 보고서 가져오기
         const report = await Report.findOne({ week: weekNum });
         if (!report || !report.content) {
             return res.status(404).send("분석할 학생 보고서가 없습니다.");
         }
 
-        // 2. [핵심] 해당 주차에 교수님이 업로드한 채점 기준(루브릭) 가져오기
         const criteria = await Criteria.findOne({ week: weekNum });
         let professorRubric = "제공된 별도의 루브릭이 없습니다. 일반적인 대학 과제 기준으로 평가하세요.";
         
         if (criteria && criteria.extractedText) {
-            professorRubric = criteria.extractedText; // 파일에서 긁어온 내용 주입!
+            professorRubric = criteria.extractedText; 
         }
 
-        // 3. OpenAI API 호출 (교수님 루브릭 주입 프롬프트 엔지니어링)
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
@@ -243,8 +268,6 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
         });
 
         const aiResponse = completion.choices[0].message.content;
-
-        // 4. 생성된 피드백을 학생 리포트 DB에 반영
         const updatedReport = await Report.findOneAndUpdate(
             { week: weekNum },
             { aiFeedback: aiResponse },
@@ -255,6 +278,67 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
+    }
+});
+
+// 5. [통합 및 중략 복구 🌟] 학생 보고서 제출 및 실시간 AI 자동 피드백 생성 API 
+app.post('/api/reports/submit', async (req, res) => {
+    const { week, title, content, authorId } = req.body;
+    try {
+        const professorCriteria = await Criteria.findOne({ week: parseInt(week) });
+        let criteriaText = "제공된 별도의 교수자 평가 기준이 없습니다. 일반적인 대학 프로젝트 기준에서 피드백해 주세요.";
+        if (professorCriteria && professorCriteria.extractedText) {
+            criteriaText = professorCriteria.extractedText;
+        }
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: `당신은 대학 강의의 전담 AI 튜터입니다. 
+                    교수님이 업로드하신 [교수자 평가 기준 및 강의 자료]를 철저히 바탕으로, 학생이 제출한 [주차별 결과물]을 분석하세요.
+                    학생의 기획 명확성, 발전 가능성을 칭찬하되, 교수님의 평가 기준에 비추어 부족한 점이나 다음 주차에 '반드시 반영해야 할 구체적인 기술/기획적 보완점'을 친절하고 건설적인 어조로 2~3문장 내외로 요약하여 피드백하세요.`
+                },
+                {
+                    role: "user",
+                    content: `[교수자 평가 기준 및 강의 내용]:\n${criteriaText}\n\n[학생 제출 결과물]:\n주차: ${week}주차\n제목: ${title}\n내용: ${content}`
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 500
+        });
+
+        const generatedFeedback = response.choices[0].message.content;
+
+        // 기존의 단순 저장 로직(app.post('/api/reports'))을 흡수하여 하나로 통합 저장합니다.
+        const updatedReport = await Report.findOneAndUpdate(
+            { week: parseInt(week) },
+            { title, content, authorId, aiFeedback: generatedFeedback },
+            { upsert: true, new: true }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "보고서가 제출되었으며, AI 피드백이 성공적으로 생성되었습니다.",
+            report: updatedReport
+        });
+    } catch (error) {
+        console.error("AI 피드백 생성 중 서버 에러 발생:", error);
+        res.status(500).json({ success: false, error: "AI 피드백을 생성하는 중 오류가 발생했습니다." });
+    }
+});
+
+// [추가] 특정 주차의 보고서 및 피드백을 불러오는 GET API (화면 초기 로딩용)
+app.get('/api/reports/:week', async (req, res) => {
+    try {
+        const report = await Report.findOne({ week: parseInt(req.params.week) });
+        if (!report) {
+            return res.status(404).json({ message: "해당 주차의 제출된 보고서가 없습니다." });
+        }
+        res.json(report);
+    } catch (error) {
+        res.status(500).json({ error: "데이터 로딩 실패" });
     }
 });
 

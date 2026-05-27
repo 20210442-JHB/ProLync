@@ -22,12 +22,21 @@
         </div>
     </nav>
 
-    <div id="view-login" class="view active" style="height: 100vh; padding-top: 50px;">
+<div id="view-login" class="view active" style="height: 100vh; padding-top: 50px;">
         <div class="login-box">
             <h2 style="margin-top: 0; color: var(--primary);">ProLync</h2>
-            <p style="color: var(--text-sub); margin-bottom: 30px;">역할을 선택하여 로그인하세요.</p>
-            <button class="role-btn" style="background: #374151;" onclick="login('prof')">교수자 로그인</button>
-            <button class="role-btn" style="background: var(--primary);" onclick="login('student')">학생 로그인</button>
+            <p style="color: var(--text-sub); margin-bottom: 25px;">학번/교번과 비밀번호를 입력하고 로그인하세요.</p>
+            
+            <input type="text" id="login-id" class="input-field" placeholder="학번 또는 교번">
+            <input type="password" id="login-pw" class="input-field" placeholder="비밀번호">
+            
+            <div class="radio-group" style="margin-bottom: 20px;">
+                <label><input type="radio" name="login-role" value="student" checked> 학생 로그인</label>
+                <label><input type="radio" name="login-role" value="prof"> 교수자 로그인</label>
+            </div>
+
+            <button class="role-btn" style="background: var(--primary); margin-bottom: 15px;" onclick="login()">로그인</button>
+            
             <span class="toggle-link" onclick="toggleAuthView('signup')">아직 회원이 아니신가요? 회원가입</span>
         </div>
     </div>

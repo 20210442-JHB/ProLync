@@ -121,100 +121,132 @@
         }
 
         // 회원가입 처리
-        async function processSignup() {
-            const userId = document.getElementById('signup-id').value.trim();
-            const password = document.getElementById('signup-pw').value.trim();
+// 회원가입 처리 (이름 및 역할 전송 버전으로 수정 🌟)
+async function processSignup() {
+    // 1. 화면의 입력창(이름, 학번, 비밀번호)과 선택된 라디오 버튼(역할)에서 값 긁어오기
+    const name = document.getElementById('signup-name').value.trim();
+    const userId = document.getElementById('signup-id').value.trim();
+    const password = document.getElementById('signup-pw').value.trim();
+    
+    // 선택된 역할(학생 또는 교수) 가져오기
+    const roleRadio = document.querySelector('input[name="role"]:checked');
+    const role = roleRadio ? roleRadio.value : 'student';
 
-            if(!userId || !password) {
-                alert("아이디와 비밀번호를 모두 입력해주세요.");
-                return;
-            }
+    // 2. 필수 입력값 유효성 검사
+    if(!name || !userId || !password) {
+        alert("이름, 아이디, 비밀번호를 모두 입력해주세요.");
+        return;
+    }
 
-            try {
-                const res = await fetch(`${SERVER_URL}/api/signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, password })
-                });
-                
-                const data = await res.json();
-                if (res.ok) {
-                    alert(data.message);
-                    toggleAuthView('login');
-                } else {
-                    alert(data.message || "회원가입에 실패했습니다.");
-                }
-            } catch (error) {
-                console.error("Signup Error:", error);
-                alert("서버와 통신 중 오류가 발생했습니다.");
-            }
+    try {
+        // 3. 백엔드 서버에 이름(name)과 역할(role)을 포함하여 전송!
+        const res = await fetch(`${SERVER_URL}/api/signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, password, name, role }) // 🌟 name과 role 추가!
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            alert(data.message);
+            toggleAuthView('login');
+        } else {
+            alert(data.message || "회원가입에 실패했습니다.");
+        }
+    } catch (error) {
+        console.error("Signup Error:", error);
+        alert("서버와 통신 중 오류가 발생했습니다.");
+    }
+}
+
+// 로그인 분기 처리 (학번/비밀번호 전송 버전 🌟)
+// 로그인 처리 함수 (수정 완료 🌟)
+async function login() {
+    // 1. 화면의 입력창과 라디오 버튼에서 값 긁어오기
+    const userId = document.getElementById('login-id').value.trim(); 
+    const password = document.getElementById('login-pw').value.trim();
+    
+    const roleRadio = document.querySelector('input[name="login-role"]:checked');
+    const role = roleRadio ? roleRadio.value : 'student';
+
+    currentRole = role;
+
+    // 2. 유효성 검사
+    if (!userId || !password) {
+        alert("학번/교번과 비밀번호를 모두 입력해주세요.");
+        return;
+    }
+
+    let userData;
+
+    try {
+        // 3. 백엔드 서버에 로그인 검증 요청
+        const res = await fetch(`${SERVER_URL}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, password, role }) // 비밀번호와 역할까지 검증
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            // 백엔드가 401, 403 에러 리턴 시 메시지 출력 후 중단
+            alert(data.message || "로그인에 실패했습니다.");
+            return;
         }
 
-        // 로그인 분기 처리
-        async function login(role) {
-            currentRole = role;
-            const name = role === 'prof' ? '성보경 교수' : '조현빈 학생';
-            currentUserId = role === 'prof' ? 'prof_01' : 'student_01';
+        userData = data; // 로그인 성공 시 유저 데이터 할당
+        userTokens = userData.tokens;
+        currentUserId = userData.userId;
 
-            let userData;
+    } catch (error) {
+        console.error("Connection Error:", error);
+        alert("서버와 통신할 수 없습니다. Node.js 서버가 8080번 포트에서 실행 중인지 확인하세요.");
+        return;
+    }
 
-            try {
-                // 서버에 유저 정보 확인/생성 요청
-                const res = await fetch(`${SERVER_URL}/api/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: currentUserId, name, role })
-                });
-                userData = await res.json();
-                userTokens = userData.tokens;
-            } catch (error) {
-                console.error("Connection Error:", error);
-                alert("서버와 통신할 수 없습니다. Node.js 서버가 8080번 포트에서 실행 중인지 확인하세요.");
-                return;
-            }
+    // --- 4. 로그인 성공 후 대시보드 UI 전환 (기존 로직 유지) ---
+    document.getElementById('view-login').style.display = 'none';
+    document.getElementById('view-signup').style.display = 'none';
+    
+    document.getElementById('main-nav').style.display = 'flex';
+    document.getElementById('app-body').style.display = 'flex';
+    
+    if(role === 'prof') {
+        document.getElementById('user-info').innerText = userData.name || '교수자';
+        document.getElementById('nav-tokens').style.display = 'none';
+        
+        document.getElementById('menu-ai-upload').style.display = 'flex'; 
+        document.getElementById('student-milestone-btn').style.display = 'none';
+        document.getElementById('unlock-btn').style.display = 'none';
+        document.getElementById('unlocked-content').style.display = 'block'; 
+        document.getElementById('btn-edit-report').style.display = 'none'; 
+        
+        document.getElementById('prof-ai-generate-form').style.display = 'block';
+        document.getElementById('student-reply-wrapper').style.display = 'block'; 
+    } else {
+        document.getElementById('user-info').innerText = userData.name || '학생';
+        document.getElementById('nav-tokens').style.display = 'inline-block';
+        
+        document.getElementById('menu-ai-upload').style.display = 'none'; 
+        document.getElementById('student-milestone-btn').style.display = 'block';
+        document.getElementById('unlock-btn').style.display = 'flex';
+        document.getElementById('unlocked-content').style.display = 'none';
+        document.getElementById('btn-edit-report').style.display = 'block'; 
+        
+        document.getElementById('prof-ai-generate-form').style.display = 'none';
+        document.getElementById('student-reply-wrapper').style.display = 'block'; 
+    }
 
-            document.getElementById('view-login').style.display = 'none';
-            document.getElementById('view-signup').style.display = 'none';
-            
-            document.getElementById('main-nav').style.display = 'flex';
-            document.getElementById('app-body').style.display = 'flex';
-            
-            if(role === 'prof') {
-                document.getElementById('user-info').innerText = userData.name;
-                document.getElementById('nav-tokens').style.display = 'none';
-                
-                document.getElementById('menu-ai-upload').style.display = 'flex'; 
-                document.getElementById('student-milestone-btn').style.display = 'none';
-                document.getElementById('unlock-btn').style.display = 'none';
-                document.getElementById('unlocked-content').style.display = 'block'; 
-                document.getElementById('btn-edit-report').style.display = 'none'; 
-                
-                document.getElementById('prof-ai-generate-form').style.display = 'block';
-                document.getElementById('student-reply-wrapper').style.display = 'block'; 
-            } else {
-                document.getElementById('user-info').innerText = userData.name;
-                document.getElementById('nav-tokens').style.display = 'inline-block';
-                
-                document.getElementById('menu-ai-upload').style.display = 'none'; 
-                document.getElementById('student-milestone-btn').style.display = 'block';
-                document.getElementById('unlock-btn').style.display = 'flex';
-                document.getElementById('unlocked-content').style.display = 'none';
-                document.getElementById('btn-edit-report').style.display = 'block'; 
-                
-                document.getElementById('prof-ai-generate-form').style.display = 'none';
-                document.getElementById('student-reply-wrapper').style.display = 'block'; 
-            }
-
-            updateTokenDisplay();
-            refreshMVP(); // 모든 역할(교수/학생)에서 MVP 정보 로드
-            loadReportData(1); // 1주차 데이터 로드
-            
-            document.querySelectorAll('.sidebar-menu li').forEach(el => el.classList.remove('active'));
-            document.getElementById('menu-team-home').classList.add('active');
-            
-            // 로그인 완료 후 기본 대시보드 뷰 호출 (여기서 History 푸시 발생)
-            showView('view-course-list');
-        }
+    updateTokenDisplay();
+    refreshMVP(); 
+    loadReportData(1); 
+    
+    document.querySelectorAll('.sidebar-menu li').forEach(el => el.classList.remove('active'));
+    document.getElementById('menu-team-home').classList.add('active');
+    
+    showView('view-course-list');
+}
 
         // 로그아웃 처리
         function logout() {
@@ -294,34 +326,108 @@
             }
         }
 
-        async function saveReport() {
-            const title = document.getElementById('edit-title').value;
-            const content = document.getElementById('edit-content').value;
+// prolync.js 에 추가 또는 기존 saveReport 수정
 
-            await fetch(`${SERVER_URL}/api/reports`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ week: 1, title, content, authorId: currentUserId })
-            });
+// 주차 데이터 제어를 위한 전역 변수 (기본값 1주차)
+let currentWeek = 1; 
 
-            alert("보고서가 DB에 저장되었습니다.");
-            loadReportData(1);
-            toggleEditMode();
+async function saveReport() {
+    // 1. HTML의 입력 필드에서 데이터 가져오기
+    const titleInput = document.getElementById('edit-title');
+    const contentInput = document.getElementById('edit-content');
+    
+    if (!titleInput || !contentInput) return;
+    
+    const title = titleInput.value.trim();
+    const content = contentInput.value.trim();
+
+    if (!title || !content) {
+        alert("제목과 내용을 모두 입력해 주세요.");
+        return;
+    }
+
+    // 로딩 표시 (AI가 생각하는 동안 버튼 비활성화 등 시각적 피드백)
+    const saveBtn = document.querySelector("button[onclick='saveReport()']");
+    const originalBtnText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> AI 분석 및 제출 중...";
+
+    try {
+        // 2. 백엔드 API로 데이터 전송
+        const response = await fetch(`${SERVER_URL}/api/reports/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                week: currentWeek,
+                title: title,
+                content: content
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert("🎉 보고서 제출 및 AI 피드백 학습이 완료되었습니다!");
+            
+            // 3. UI 업데이트: 보기 모드로 전환하고 데이터 채우기
+            document.getElementById('display-title').innerText = data.report.title;
+            
+            // 내용 반영 (ul 구조 유지 혹은 일반 텍스트 반영)
+            document.getElementById('display-content').innerHTML = `
+                <h4 style="color: white; margin-top: 20px;">제출 내용</h4>
+                <p style="color: #cbd5e1; line-height: 1.6; white-space: pre-wrap;">${data.report.content}</p>
+            `;
+
+            // 4. AI 피드백 영역에 답변 뿌려주기
+            // HTML 내의 <p style="margin-bottom: 0; ..."> 태그를 찾기 쉽게 ID나 선택자로 지정하여 변경합니다.
+            const feedbackTextElement = document.querySelector('#feedback-display-area p');
+            if (feedbackTextElement) {
+                feedbackTextElement.innerText = data.report.aiFeedback;
+            }
+
+            // 수정 모드 닫고 뷰 모드로 원복
+            toggleEditMode(); 
+            
+            // 축하 이펙트 (인덱스에 선언된 폭죽 효과 실행!)
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            }
+        } else {
+            alert("오류 발생: " + data.error);
         }
 
-        async function loadReportData(week) {
-            const res = await fetch(`${SERVER_URL}/api/reports/${week}`);
+    } catch (error) {
+        console.error("보고서 제출 통신 에러:", error);
+        alert("서버와 통신하는 중 실패했습니다.");
+    } finally {
+        // 버튼 복구
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtnText;
+    }
+}
+
+// 화면이 처음 켜지거나 조가 선택되었을 때 기존 데이터를 가져와서 뿌려주는 함수도 추가하면 좋습니다.
+async function loadReportData(week) {
+    currentWeek = week;
+    try {
+        const res = await fetch(`${SERVER_URL}/api/reports/${week}`);
+        if (res.ok) {
             const data = await res.json();
-            if (data.title) {
-                document.getElementById('display-title').innerText = data.title;
-                document.getElementById('display-content').innerText = data.content;
-                if (data.studentReply) {
-                    document.getElementById('student-reply-form').style.display = 'none';
-                    document.getElementById('student-reply-display').style.display = 'block';
-                    document.getElementById('student-reply-text').innerText = data.studentReply;
-                }
+            document.getElementById('display-title').innerText = data.title;
+            document.getElementById('edit-title').value = data.title;
+            document.getElementById('edit-content').value = data.content;
+            
+            const feedbackTextElement = document.querySelector('#feedback-display-area p');
+            if (feedbackTextElement) {
+                feedbackTextElement.innerText = data.aiFeedback;
             }
         }
+    } catch (err) {
+        console.log("기존 데이터가 없거나 로딩 실패(처음 작성하는 주차)");
+    }
+}
 
         // AI 피드백 자동 생성
         async function generateAIFeedback() {
