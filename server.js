@@ -15,7 +15,6 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
 
-// 업로드된 파일이 임시로 저장될 폴더 설정
 const upload = multer({ dest: 'uploads/' });
 
 const app = express();
@@ -24,20 +23,13 @@ const PORT = 8080;
 // Middleware
 app.use(express.json());
 app.use(cors());
-// 모든 요청에 대해 로그 출력 (연결 확인용)
 app.use((req, res, next) => {
     console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.url}`);
     next();
 });
 app.use(express.static(__dirname));
 
-// MongoDB Connection (로컬 DB 사용 예시)
-//mongoose.connect('mongodb://127.0.0.1:27017/prolync')
-// 개인 클라우드 DB 연결 (변경)
-// prolync의 위치를 물음표(?) 앞으로 옮깁니다.
-const db_uri = 'mongodb+srv://habin:habin11013~@cluster0.9w4124b.mongodb.net/prolync?appName=Cluster0';
-
-mongoose.connect(db_uri)
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('개인 클라우드 MongoDB Connected...'))
   .catch(err => {
     console.error('!!! MongoDB 연결 실패 !!!');
@@ -59,7 +51,12 @@ const ReportSchema = new mongoose.Schema({
     content: String,
     authorId: String,
     aiFeedback: String,
-    studentReply: String,
+    studentReplies: [{
+        name: String,
+        content: String,
+        createdAt: { type: Date, default: Date.now },
+        profReplies: [{ name: String, content: String, createdAt: { type: Date, default: Date.now } }]
+    }],
     isLocked: { type: Boolean, default: true }
 });
 
@@ -68,13 +65,31 @@ const Report = mongoose.model('Report', ReportSchema);
 
 // 교수자가 업로드한 주차별 피드백 기준 자료 스키마
 const CriteriaSchema = new mongoose.Schema({
-    week: { type: Number, required: true, unique: true },
+    week: { type: Number, required: true },
     fileName: String,
     extractedText: String, // 파일에서 긁어온 실제 텍스트 내용 🌟
     updatedAt: { type: Date, default: Date.now }
 });
 
 const Criteria = mongoose.model('Criteria', CriteriaSchema);
+
+const CourseSchema = new mongoose.Schema({
+    title: { type: String, required: true },
+    inviteCode: { type: String, unique: true },
+    professorId: { type: String, required: true },
+    professorName: String,
+    enrolledStudents: [{ userId: String, name: String, joinedAt: { type: Date, default: Date.now } }],
+    createdAt: { type: Date, default: Date.now }
+});
+
+const Course = mongoose.model('Course', CourseSchema);
+
+function generateInviteCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+}
 
 // API Routes
 
@@ -168,10 +183,111 @@ app.get('/api/users/total-tokens', async (req, res) => {
     }
 });
 
-// 2. 특정 주차 보고서 및 피드백 조회 (중복 제거 및 404 예외 처리 통합 🌟)
+// 과목 생성 (교수자)
+app.post('/api/courses', async (req, res) => {
+    const { title, professorId, professorName } = req.body;
+    if (!title || !professorId) return res.status(400).json({ message: "과목명과 교수자 정보가 필요합니다." });
+    try {
+        let inviteCode;
+        let exists = true;
+        while (exists) {
+            inviteCode = generateInviteCode();
+            exists = await Course.findOne({ inviteCode });
+        }
+        const course = new Course({ title, inviteCode, professorId, professorName });
+        await course.save();
+        res.json(course);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 과목 참여 (학생 — 초대 코드 입력)
+app.post('/api/courses/join', async (req, res) => {
+    const { inviteCode, userId, name } = req.body;
+    if (!inviteCode || !userId) return res.status(400).json({ message: "초대 코드와 학번이 필요합니다." });
+    try {
+        const course = await Course.findOne({ inviteCode: inviteCode.toUpperCase() });
+        if (!course) return res.status(404).json({ message: "유효하지 않은 초대 코드입니다." });
+        if (course.enrolledStudents.some(s => s.userId === userId)) {
+            return res.status(400).json({ message: "이미 참여 중인 과목입니다." });
+        }
+        course.enrolledStudents.push({ userId, name });
+        await course.save();
+        res.json(course);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 사용자별 과목 목록 조회
+app.get('/api/courses/by-user/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const { role } = req.query;
+    try {
+        const courses = role === 'prof'
+            ? await Course.find({ professorId: userId }).sort({ createdAt: -1 })
+            : await Course.find({ 'enrolledStudents.userId': userId }).sort({ createdAt: -1 });
+        res.json(courses);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 과목 삭제 (교수자)
+app.delete('/api/courses/:courseId', async (req, res) => {
+    try {
+        const course = await Course.findByIdAndDelete(req.params.courseId);
+        if (!course) return res.status(404).json({ message: "과목을 찾을 수 없습니다." });
+        res.json({ message: "과목이 삭제되었습니다." });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 2. 주차별 진행 상황 전체 분석 요약 (교수용) — :week 라우트보다 반드시 먼저 등록
+app.get('/api/reports/overall-summary', async (req, res) => {
+    try {
+        const reports = await Report.find({}).sort({ week: 1 });
+
+        if (reports.length === 0) {
+            return res.json({ summary: "아직 제출된 보고서가 없어 분석을 진행할 수 없습니다." });
+        }
+
+        const reportsContext = reports.map(r =>
+            `[${r.week}주차] 제목: ${r.title}\n내용: ${r.content}\nAI피드백: ${r.aiFeedback || '없음'}`
+        ).join("\n\n---\n\n");
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: `당신은 교수님을 보좌하는 교육 분석 전문가입니다.
+                    학생들의 주차별 보고서와 AI 피드백 내역을 분석하여, 현재 학습이 어떻게 진행되고 있는지 요약해 주세요.
+                    전체적인 학습 흐름, 학생의 성장 포인트, 그리고 교수님이 특히 신경 써야 할 부분을 포함하여 5줄 이내로 전문적으로 작성해 주세요.`
+                },
+                {
+                    role: "user",
+                    content: `현재까지의 보고서 내역입니다:\n\n${reportsContext}`
+                }
+            ],
+        });
+
+        res.json({ summary: completion.choices[0].message.content });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send(err.message);
+    }
+});
+
+// 3. 특정 주차 보고서 및 피드백 조회
 app.get('/api/reports/:week', async (req, res) => {
     try {
         const weekNum = parseInt(req.params.week);
+        if (isNaN(weekNum)) {
+            return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
+        }
         const report = await Report.findOne({ week: weekNum });
         if (!report) {
             return res.status(404).json({ message: "해당 주차의 제출된 보고서가 없습니다." });
@@ -241,7 +357,7 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
             return res.status(404).send("분석할 학생 보고서가 없습니다.");
         }
 
-        const criteria = await Criteria.findOne({ week: weekNum });
+        const criteria = await Criteria.findOne({ week: weekNum }).sort({ updatedAt: -1 });
         let professorRubric = "제공된 별도의 루브릭이 없습니다. 일반적인 대학 과제 기준으로 평가하세요.";
         
         if (criteria && criteria.extractedText) {
@@ -285,7 +401,7 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
 app.post('/api/reports/submit', async (req, res) => {
     const { week, title, content, authorId } = req.body;
     try {
-        const professorCriteria = await Criteria.findOne({ week: parseInt(week) });
+        const professorCriteria = await Criteria.findOne({ week: parseInt(week) }).sort({ updatedAt: -1 });
         let criteriaText = "제공된 별도의 교수자 평가 기준이 없습니다. 일반적인 대학 프로젝트 기준에서 피드백해 주세요.";
         if (professorCriteria && professorCriteria.extractedText) {
             criteriaText = professorCriteria.extractedText;
@@ -329,65 +445,112 @@ app.post('/api/reports/submit', async (req, res) => {
     }
 });
 
-// [추가] 특정 주차의 보고서 및 피드백을 불러오는 GET API (화면 초기 로딩용)
-app.get('/api/reports/:week', async (req, res) => {
+// 5. 학생 코멘트 등록
+app.patch('/api/reports/:week/reply', async (req, res) => {
+    const { reply, name } = req.body;
+    const weekNum = parseInt(req.params.week);
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
     try {
-        const report = await Report.findOne({ week: parseInt(req.params.week) });
-        if (!report) {
-            return res.status(404).json({ message: "해당 주차의 제출된 보고서가 없습니다." });
-        }
+        const report = await Report.findOneAndUpdate(
+            { week: weekNum },
+            { $push: { studentReplies: { name: name || '학생', content: reply } } },
+            { new: true }
+        );
         res.json(report);
-    } catch (error) {
-        res.status(500).json({ error: "데이터 로딩 실패" });
-    }
-});
-
-// 4. [신규] 주차별 진행 상황 전체 분석 요약 (교수용) 🌟
-app.get('/api/reports/overall-summary', async (req, res) => {
-    try {
-        // 모든 보고서를 가져옴 (필요 시 특정 학생/팀으로 필터링 가능)
-        const reports = await Report.find({}).sort({ week: 1 });
-        
-        if (reports.length === 0) {
-            return res.json({ summary: "아직 제출된 보고서가 없어 분석을 진행할 수 없습니다." });
-        }
-
-        // 보고서 데이터 가공
-        const reportsContext = reports.map(r => 
-            `[${r.week}주차] 제목: ${r.title}\n내용: ${r.content}\nAI피드백: ${r.aiFeedback || '없음'}`
-        ).join("\n\n---\n\n");
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { 
-                    role: "system", 
-                    content: `당신은 교수님을 보좌하는 교육 분석 전문가입니다. 
-                    학생들의 주차별 보고서와 AI 피드백 내역을 분석하여, 현재 학습이 어떻게 진행되고 있는지 요약해 주세요.
-                    전체적인 학습 흐름, 학생의 성장 포인트, 그리고 교수님이 특히 신경 써야 할 부분을 포함하여 5줄 이내로 전문적으로 작성해 주세요.` 
-                },
-                { 
-                    role: "user", 
-                    content: `현재까지의 보고서 내역입니다:\n\n${reportsContext}` 
-                }
-            ],
-        });
-
-        res.json({ summary: completion.choices[0].message.content });
     } catch (err) {
-        console.error(err);
         res.status(500).send(err.message);
     }
 });
 
-// 5. 학생 답변 등록
-app.patch('/api/reports/:week/reply', async (req, res) => {
-    const { reply } = req.body;
+// 6. 학생 코멘트 수정
+app.patch('/api/reports/:week/reply/:replyId', async (req, res) => {
+    const { content } = req.body;
     const weekNum = parseInt(req.params.week);
+    const { replyId } = req.params;
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
+    try {
+        const report = await Report.findOneAndUpdate(
+            { week: weekNum, 'studentReplies._id': replyId },
+            { $set: { 'studentReplies.$.content': content } },
+            { new: true }
+        );
+        if (!report) return res.status(404).json({ message: "코멘트를 찾을 수 없습니다." });
+        res.json(report);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 7. 학생 코멘트 삭제
+app.delete('/api/reports/:week/reply/:replyId', async (req, res) => {
+    const weekNum = parseInt(req.params.week);
+    const { replyId } = req.params;
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
     try {
         const report = await Report.findOneAndUpdate(
             { week: weekNum },
-            { studentReply: reply },
+            { $pull: { studentReplies: { _id: replyId } } },
+            { new: true }
+        );
+        res.json(report);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 8. 교수 답글 등록 (특정 코멘트 지정)
+app.post('/api/reports/:week/reply/:replyId/prof-reply', async (req, res) => {
+    const { content, name } = req.body;
+    const weekNum = parseInt(req.params.week);
+    const { replyId } = req.params;
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
+    try {
+        const report = await Report.findOneAndUpdate(
+            { week: weekNum, 'studentReplies._id': replyId },
+            { $push: { 'studentReplies.$.profReplies': { name: name || '교수자', content } } },
+            { new: true }
+        );
+        if (!report) return res.status(404).json({ message: "코멘트를 찾을 수 없습니다." });
+        res.json(report);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 9. 교수 답글 수정
+app.patch('/api/reports/:week/reply/:replyId/prof-reply/:profReplyId', async (req, res) => {
+    const { content } = req.body;
+    const weekNum = parseInt(req.params.week);
+    const { replyId, profReplyId } = req.params;
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
+    try {
+        const report = await Report.findOneAndUpdate(
+            { week: weekNum },
+            { $set: { 'studentReplies.$[sr].profReplies.$[pr].content': content } },
+            {
+                arrayFilters: [
+                    { 'sr._id': new mongoose.Types.ObjectId(replyId) },
+                    { 'pr._id': new mongoose.Types.ObjectId(profReplyId) }
+                ],
+                new: true
+            }
+        );
+        if (!report) return res.status(404).json({ message: "답글을 찾을 수 없습니다." });
+        res.json(report);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// 10. 교수 답글 삭제
+app.delete('/api/reports/:week/reply/:replyId/prof-reply/:profReplyId', async (req, res) => {
+    const weekNum = parseInt(req.params.week);
+    const { replyId, profReplyId } = req.params;
+    if (isNaN(weekNum)) return res.status(400).json({ message: "유효하지 않은 주차 번호입니다." });
+    try {
+        const report = await Report.findOneAndUpdate(
+            { week: weekNum, 'studentReplies._id': replyId },
+            { $pull: { 'studentReplies.$.profReplies': { _id: profReplyId } } },
             { new: true }
         );
         res.json(report);
