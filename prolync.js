@@ -9,10 +9,8 @@
         // 서버 주소 설정 (포트 번호 확인)
         const SERVER_URL = 'http://localhost:8080';
 
-        // 🌟 [추가] 1. 초기 로딩 시 기본 상태(로그인 화면)를 History에 저장
         history.replaceState({ viewId: 'view-login' }, "", "#view-login");
 
-        // 🌟 [수정] 2. 뷰 전환 시 History API를 활용하여 상태 기록
         function showView(viewId, pushToHistory = true) {
             document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
             
@@ -27,7 +25,6 @@
             }
         }
 
-        // 🌟 [추가] 3. 브라우저 뒤로가기/앞으로가기 이벤트(popstate) 감지 처리
         window.addEventListener('popstate', (event) => {
             if (event.state && event.state.viewId) {
                 const viewId = event.state.viewId;
@@ -63,7 +60,6 @@
             }
         });
 
-        // 🌟 [수정] 로그인/회원가입 뷰 전환 시 History 기록 추가
         function toggleAuthView(type, pushToHistory = true) {
             document.getElementById('view-login').classList.remove('active');
             document.getElementById('view-signup').classList.remove('active');
@@ -89,7 +85,6 @@
             });
         }
 
-        // [추가] DB에서 최신 MVP 정보를 가져와 UI 업데이트
         async function refreshMVP() {
             try {
                 const res = await fetch(`${SERVER_URL}/api/users/mvp`);
@@ -106,7 +101,6 @@
             }
         }
 
-        // [추가] 토큰 변경 시 DB에 저장하고 MVP 정보 갱신
         async function syncTokensWithDB(newAmount) {
             userTokens = newAmount;
             updateTokenDisplay();
@@ -123,7 +117,6 @@
         }
 
         // 회원가입 처리
-// 회원가입 처리 (이름 및 역할 전송 버전으로 수정 🌟)
 async function processSignup() {
     // 1. 화면의 입력창(이름, 학번, 비밀번호)과 선택된 라디오 버튼(역할)에서 값 긁어오기
     const name = document.getElementById('signup-name').value.trim();
@@ -161,8 +154,7 @@ async function processSignup() {
     }
 }
 
-// 로그인 분기 처리 (학번/비밀번호 전송 버전 🌟)
-// 로그인 처리 함수 (수정 완료 🌟)
+        // 로그인 처리
 async function login() {
     // 1. 화면의 입력창과 라디오 버튼에서 값 긁어오기
     const userId = document.getElementById('login-id').value.trim(); 
@@ -430,7 +422,6 @@ async function login() {
             }
         }
 
-        // [추가] 전체 누적 토큰 양 가져오기
         async function loadTotalTokens() {
             const totalTokensEl = document.getElementById('total-cumulative-tokens');
             if (!totalTokensEl) return;
@@ -443,7 +434,6 @@ async function login() {
             }
         }
 
-        // 🌟 [추가] AI 주차별 진행 상황 전체 분석 요약 가져오기
         async function loadOverallSummary() {
             const summaryEl = document.getElementById('ai-overall-summary-text');
             if (!summaryEl) return;
@@ -463,7 +453,6 @@ async function login() {
             showView('view-team-detail');
         }
         
-        // 🌟 [수정] 내부 뒤로가기 버튼 역시 브라우저 History 제어를 따르도록 수정
         function goBackToDashboard() {
             history.back(); 
         }
@@ -481,10 +470,7 @@ async function login() {
             }
         }
 
-// prolync.js 에 추가 또는 기존 saveReport 수정
-
-// 주차 데이터 제어를 위한 전역 변수 (기본값 1주차)
-let currentWeek = 1; 
+        let currentWeek = 1;
 
 async function saveReport() {
     // 1. HTML의 입력 필드에서 데이터 가져오기
@@ -548,7 +534,6 @@ async function saveReport() {
     }
 }
 
-// 화면이 처음 켜지거나 조가 선택되었을 때 기존 데이터를 가져와서 뿌려주는 함수도 추가하면 좋습니다.
 async function loadReportData(week) {
     currentWeek = week;
     try {
@@ -907,8 +892,7 @@ function clearReportUI() {
             }
         }
         
-// prolync.js에 추가할 파일 전송 함수
-async function uploadProfessorFile(inputElement) {
+        async function uploadProfessorFile(inputElement) {
     const file = inputElement.files[0];
     if (!file) return;
 

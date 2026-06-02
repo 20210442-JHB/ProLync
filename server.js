@@ -10,8 +10,6 @@ const mongoose = require('mongoose');
 const path = require('path');
 const cors = require('cors');
 const multer = require('multer');
-// 🌟 [수정 버전] 이렇게 변경해 주세요!
-// 🌟 [최종 대안] 위 코드로 안 될 경우 이 방식으로 작성하세요.
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
 
@@ -99,7 +97,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 1-1. 회원가입 처리 API (이름, 역할 연동 완료 🌟)
+// 회원가입 API
 app.post('/api/signup', async (req, res) => {
     const { userId, password, name, role } = req.body; 
     try {
@@ -124,7 +122,7 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
-// 1-2. 사용자 로그인 검증 및 데이터 조회 (업그레이드 버전 🌟)
+// 로그인 API
 app.post('/api/login', async (req, res) => {
     const { userId, password, role } = req.body;
     try {
@@ -145,7 +143,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// [추가] 특정 사용자의 토큰 업데이트 API
+// 특정 사용자의 토큰 업데이트 API
 app.patch('/api/users/:userId/tokens', async (req, res) => {
     const { userId } = req.params;
     const { tokens } = req.body;
@@ -161,7 +159,7 @@ app.patch('/api/users/:userId/tokens', async (req, res) => {
     }
 });
 
-// [추가] 최다 토큰 보유 MVP 조회 API
+// 최다 토큰 보유 MVP 조회 API
 app.get('/api/users/mvp', async (req, res) => {
     try {
         const topUser = await User.findOne().sort({ tokens: -1 });
@@ -171,7 +169,7 @@ app.get('/api/users/mvp', async (req, res) => {
     }
 });
 
-// [추가] 모든 사용자의 누적 토큰 합계 조회 API
+// 모든 사용자의 누적 토큰 합계 조회 API
 app.get('/api/users/total-tokens', async (req, res) => {
     try {
         const result = await User.aggregate([
@@ -245,7 +243,7 @@ app.delete('/api/courses/:courseId', async (req, res) => {
     }
 });
 
-// 2. 주차별 진행 상황 전체 분석 요약 (교수용) — :week 라우트보다 반드시 먼저 등록
+// 주차별 진행 상황 전체 분석 요약 (교수용) — :week 라우트보다 반드시 먼저 등록
 app.get('/api/reports/overall-summary', async (req, res) => {
     try {
         const reports = await Report.find({}).sort({ week: 1 });
@@ -397,7 +395,7 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
     }
 });
 
-// 5. [통합 및 중략 복구 🌟] 학생 보고서 제출 및 실시간 AI 자동 피드백 생성 API 
+// 학생 보고서 제출 및 AI 자동 피드백 생성 API
 app.post('/api/reports/submit', async (req, res) => {
     const { week, title, content, authorId } = req.body;
     try {
