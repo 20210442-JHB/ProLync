@@ -133,15 +133,11 @@
 
             <input type="file" id="hidden-file-input" style="display: none;" onchange="uploadProfessorFile(this)">
 
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+                    <div id="criteria-list-wrapper" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
                         <div style="font-weight: bold; margin-bottom: 10px; font-size: 0.95rem;">학습 완료된 자료 목록</div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; font-size: 0.9rem;">
-                            <span><i class="fa-regular fa-file-pdf" style="color: #e74c3c;"></i> 1주차_서비스기획_핵심요소.pdf</span>
-                            <span style="color: var(--green);"><i class="fa-solid fa-check"></i> 학습 완료</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
-                            <span><i class="fa-solid fa-file-excel" style="color: #2ecc71;"></i> 2026_1학기_프로젝트_채점루브릭.xlsx</span>
-                            <span style="color: var(--green);"><i class="fa-solid fa-check"></i> 학습 완료</span>
+                        <div id="criteria-list-container">
+                            <!-- 업로드된 자료 목록이 여기에 동적으로 표시됩니다 -->
+                            <p style="color: #94a3b8; text-align: center; font-size: 0.9rem;">자료를 불러오는 중...</p>
                         </div>
                     </div>
                 </div>

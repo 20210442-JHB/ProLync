@@ -13,8 +13,28 @@ const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
 
-const upload = multer({ dest: 'uploads/' });
+if (!fs.existsSync('uploads/')) {
+    fs.mkdirSync('uploads/');
+}
 
+// 업로드된 파일이 임시로 저장될 폴더 설정 및 파일명 인코딩 처리
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/') // 파일이 저장될 경로
+  },
+  filename: function (req, file, cb) {
+    // 파일명에 한글 등 비ASCII 문자가 깨지는 현상 방지
+    // originalname이 latin1으로 잘못 해석되었을 경우를 대비하여 UTF-8로 재인코딩 시도
+    try {
+        const decodedName = Buffer.from(file.originalname, 'binary').toString('utf8');
+        cb(null, Date.now() + '-' + decodedName);
+    } catch (e) {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+  }
+});
+
+const upload = multer({ storage: storage });
 const app = express();
 const PORT = 8080;
 
@@ -28,7 +48,17 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('개인 클라우드 MongoDB Connected...'))
+  .then(() => {
+    console.log('개인 클라우드 MongoDB Connected...');
+    mongoose.connection.once('open', async () => {
+        try {
+            await mongoose.connection.db.collection('criterias').dropIndex('week_1');
+            console.log("기존 unique 인덱스(criterias.week_1)를 성공적으로 삭제했습니다.");
+        } catch (e) {
+            console.log("유니크 인덱스가 이미 없거나 삭제할 필요가 없습니다.");
+        }
+    });
+  })
   .catch(err => {
     console.error('!!! MongoDB 연결 실패 !!!');
     console.error(err);
@@ -296,6 +326,42 @@ app.get('/api/reports/:week', async (req, res) => {
     }
 });
 
+// [추가] 교수자가 업로드한 모든 주차별 기준 자료 목록 조회 API
+app.get('/api/upload-criteria', async (req, res) => {
+    try {
+        const allCriteria = await Criteria.find({}).sort({ week: 1 });
+        res.json(allCriteria);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// [추가] 업로드된 기준 자료 삭제 API
+app.delete('/api/upload-criteria/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // 1. 유효하지 않은 ObjectId 형식 체크
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            console.warn(`[DELETE] 유효하지 않은 ObjectId 형식: ${id}`);
+            return res.status(400).send("유효하지 않은 자료 ID 형식입니다.");
+        }
+
+        const deletedCriteria = await Criteria.findByIdAndDelete(id);
+
+        // 2. 삭제할 자료를 찾을 수 없는 경우
+        if (!deletedCriteria) {
+            console.warn(`[DELETE] ID ${id}를 가진 자료를 찾을 수 없습니다.`);
+            return res.status(404).send("삭제할 자료를 찾을 수 없습니다.");
+        }
+
+        console.log(`[DELETE] ID ${id} 자료가 성공적으로 삭제되었습니다.`);
+        res.json({ message: "자료가 성공적으로 삭제되었습니다." });
+    } catch (err) {
+        console.error("자료 삭제 중 서버 에러 발생:", err); // 상세 에러 로그
+        res.status(500).send(`서버 오류: ${err.message}`); // 클라이언트에 더 명확한 메시지 전달
+    }
+});
+
 // 3. 교수용: 강의자료/루브릭 파일 업로드 및 텍스트 학습 API
 app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) => {
     try {
@@ -304,7 +370,15 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
             return res.status(400).send("업로드된 파일이 없습니다.");
         }
 
-        console.log(`[파일 업로드 시작] 파일명: ${req.file.originalname}, 타입: ${req.file.mimetype}`);
+        // 파일명 인코딩 해결 (latin1 대신 binary로 시도하여 더 범용적으로 대응)
+        let safeFileName = req.file.originalname;
+        try {
+            safeFileName = Buffer.from(req.file.originalname, 'binary').toString('utf8');
+        } catch (e) {
+            console.error("파일명 디코딩 실패:", e);
+        }
+
+        console.log(`[파일 업로드] 주차: ${weekNum}, 파일명: ${safeFileName}`);
         let extractedText = "";
 
         if (req.file.mimetype === 'application/pdf') {
@@ -326,15 +400,14 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
             fs.unlinkSync(req.file.path);
         }
 
-        const criteria = await Criteria.findOneAndUpdate(
-            { week: weekNum },
-            { 
-                fileName: req.file.originalname, 
-                extractedText: extractedText,
-                updatedAt: new Date()
-            },
-            { upsert: true, new: true }
-        );
+        // [수정] findOneAndUpdate 대신 new Criteria().save()를 사용하여 다중 파일 허용
+        const criteria = new Criteria({
+            week: weekNum,
+            fileName: safeFileName,
+            extractedText: extractedText,
+            updatedAt: new Date()
+        });
+        await criteria.save();
 
         res.json({ message: "성공적으로 파일을 학습했습니다.", criteria });
     } catch (err) {
@@ -355,11 +428,11 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
             return res.status(404).send("분석할 학생 보고서가 없습니다.");
         }
 
-        const criteria = await Criteria.findOne({ week: weekNum }).sort({ updatedAt: -1 });
+        const allCriteria = await Criteria.find({ week: weekNum });
         let professorRubric = "제공된 별도의 루브릭이 없습니다. 일반적인 대학 과제 기준으로 평가하세요.";
         
-        if (criteria && criteria.extractedText) {
-            professorRubric = criteria.extractedText; 
+        if (allCriteria.length > 0) {
+            professorRubric = allCriteria.map(c => `[파일명: ${c.fileName}]\n${c.extractedText}`).join("\n\n---\n\n");
         }
 
         const completion = await openai.chat.completions.create({
@@ -399,10 +472,10 @@ app.patch('/api/reports/:week/ai-feedback', async (req, res) => {
 app.post('/api/reports/submit', async (req, res) => {
     const { week, title, content, authorId } = req.body;
     try {
-        const professorCriteria = await Criteria.findOne({ week: parseInt(week) }).sort({ updatedAt: -1 });
+        const allCriteria = await Criteria.find({ week: parseInt(week) });
         let criteriaText = "제공된 별도의 교수자 평가 기준이 없습니다. 일반적인 대학 프로젝트 기준에서 피드백해 주세요.";
-        if (professorCriteria && professorCriteria.extractedText) {
-            criteriaText = professorCriteria.extractedText;
+        if (allCriteria.length > 0) {
+            criteriaText = allCriteria.map(c => `[파일명: ${c.fileName}]\n${c.extractedText}`).join("\n\n---\n\n");
         }
 
         const response = await openai.chat.completions.create({
