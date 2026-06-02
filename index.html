@@ -78,14 +78,46 @@
         <main class="main-content">
             
             <div id="view-course-list" class="view">
-                <h2>나의 과목</h2>
-                <div class="course-item" onclick="enterCourse()">
-                    <div>
-                        <h3 style="margin: 0 0 5px 0;">디지털스토리텔링 (2150551202)</h3>
-                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-sub);">2026년 1학기 | 성보경 교수</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h2 style="margin: 0;">나의 과목</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-create-course" class="btn" style="display: none;" onclick="document.getElementById('create-course-form').style.display = document.getElementById('create-course-form').style.display === 'none' ? 'block' : 'none'; document.getElementById('invite-code-result').style.display='none';">
+                            <i class="fa-solid fa-plus"></i> 과목 생성
+                        </button>
+                        <button id="btn-join-course" class="btn" style="display: none; background: var(--green);" onclick="document.getElementById('join-course-form').style.display = document.getElementById('join-course-form').style.display === 'none' ? 'block' : 'none'">
+                            <i class="fa-solid fa-right-to-bracket"></i> 초대 코드로 참여
+                        </button>
                     </div>
-                    <button class="btn">과목 홈 바로가기 <i class="fa-solid fa-arrow-right"></i></button>
                 </div>
+
+                <!-- 교수자: 과목 생성 폼 -->
+                <div id="create-course-form" style="display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: var(--text-main);">새 과목 생성</h3>
+                    <input type="text" id="new-course-title" class="input-field" placeholder="과목명을 입력하세요 (예: 디지털스토리텔링)">
+                    <div style="text-align: right; margin-top: 5px;">
+                        <button class="btn btn-outline" style="margin-right: 10px;" onclick="document.getElementById('create-course-form').style.display='none'">취소</button>
+                        <button class="btn" onclick="createCourse()"><i class="fa-solid fa-wand-magic-sparkles"></i> 생성 및 초대 코드 발급</button>
+                    </div>
+                    <!-- 생성 후 초대 코드 표시 -->
+                    <div id="invite-code-result" style="display: none; margin-top: 20px; background: var(--token-bg); border: 1px dashed var(--token-text); border-radius: 10px; padding: 20px; text-align: center;">
+                        <p style="margin: 0 0 8px 0; color: var(--token-text); font-weight: 600;"><i class="fa-solid fa-party-horn"></i> 과목 "<span id="result-course-title"></span>"이 생성되었습니다!</p>
+                        <p style="margin: 0 0 12px 0; color: var(--text-sub); font-size: 0.9rem;">학생들에게 아래 초대 코드를 공유하세요.</p>
+                        <div style="font-size: 2rem; font-weight: 800; letter-spacing: 8px; color: var(--primary); margin-bottom: 12px;" id="result-invite-code"></div>
+                        <button class="btn" style="background: var(--token-text);" onclick="copyInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
+                    </div>
+                </div>
+
+                <!-- 학생: 초대 코드 입력 폼 -->
+                <div id="join-course-form" style="display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 25px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: var(--text-main);">초대 코드로 과목 참여</h3>
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <input type="text" id="join-course-code" class="input-field" style="margin: 0; flex: 1; text-transform: uppercase; letter-spacing: 3px; font-size: 1.1rem; font-weight: bold;" placeholder="초대 코드 6자리" maxlength="6">
+                        <button class="btn" style="background: var(--green); padding: 12px 20px; white-space: nowrap;" onclick="joinCourse()"><i class="fa-solid fa-right-to-bracket"></i> 참여하기</button>
+                    </div>
+                </div>
+
+                <!-- 동적 과목 목록 -->
+                <div id="course-dynamic-list"></div>
             </div>
 
             <div id="view-ai-upload" class="view">
@@ -323,10 +355,7 @@
                             </p>
                             
                             <div id="student-reply-wrapper" class="student-reply-box" style="display: none;">
-                                <div id="student-reply-display" style="display: none; background: rgba(255,255,255,0.6); padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid var(--primary);">
-                                    <strong style="color: var(--primary); font-size: 0.9rem;"><i class="fa-solid fa-reply"></i> 학생 코멘트 (조현빈)</strong>
-                                    <p id="student-reply-text" style="margin: 5px 0 0 0; font-size: 0.95rem; color: #333; line-height: 1.5;"></p>
-                                </div>
+                                <div id="student-reply-display" style="display: none;"></div>
                                 
                                 <div id="student-reply-form">
                                     <textarea id="reply-textarea" class="student-reply-input" placeholder="AI 피드백에 대해 교수님께 질문하거나 추가 코멘트를 남겨주세요."></textarea>
@@ -352,7 +381,7 @@
                         
                         <div id="prof-ai-generate-form" style="margin-top: 15px; display: none; background: var(--ai-light); border: 1px solid #d8b4fe; padding: 20px; border-radius: 8px;">
                             <h4 style="margin-top:0; color: #6b21a8;"><i class="fa-solid fa-robot"></i> AI 주차별 자동 피드백 생성</h4>
-                            <p style="font-size: 0.9rem; color: #4c1d95; line-height: 1.5; margin-bottom: 20px;">업로드된 [1주차 강의자료] 및 [채점 루브릭]을 바탕으로 학생 결과물을 분석하여 맞춤형 피드백을 생성합니다. 교수님의 수작업 없이 즉시 학생에게 발송됩니다.</p>
+                            <p style="font-size: 0.9rem; color: #4c1d95; line-height: 1.5; margin-bottom: 20px;">업로드된 강의자료 및 채점 루브릭을 바탕으로 학생 결과물을 분석하여 맞춤형 피드백을 생성합니다. 교수님의 수작업 없이 즉시 학생에게 발송됩니다.</p>
                             <button class="btn" style="background: var(--ai-color); width: 100%; border-radius: 8px;" onclick="generateAIFeedback()">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> 분석 및 피드백 자동 발송
                             </button>
