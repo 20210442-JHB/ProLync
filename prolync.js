@@ -8,7 +8,7 @@
         let mvpUserName = '김철수'; // 이달의 MVP 이름 (예시 초기값)
 
         // 서버 주소 설정 (포트 번호 확인)
-        const SERVER_URL = 'http://localhost:8080';
+        const SERVER_URL = 'https://prolync-2he4.onrender.com';
 
         history.replaceState({ viewId: 'view-login' }, "", "#view-login");
 
