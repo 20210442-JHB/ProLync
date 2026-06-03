@@ -71,7 +71,7 @@
             <ul class="sidebar-menu">
                 <li onclick="showView('view-course-list')"><i class="fa-solid fa-house"></i> 나의 과목</li>
                 <li class="active" id="menu-team-home" onclick="enterCourse()"><i class="fa-solid fa-laptop-file"></i> 팀 현황 관제탑</li>
-                <li id="menu-ai-upload" class="ai-menu" style="display:none;" onclick="showView('view-ai-upload')"><i class="fa-solid fa-file-arrow-up"></i> AI 피드백 기준 업로드</li>
+                <li id="menu-ai-upload" class="ai-menu" style="display:none;"></li>
             </ul>
         </aside>
 
@@ -120,24 +120,179 @@
                 <div id="course-dynamic-list"></div>
             </div>
 
+            <!-- ── 조(Group) 목록 뷰 ─────────────────────────────────── -->
+            <div id="view-group-list" class="view">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h2 id="group-list-course-title" style="margin: 0;">과목 이름</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-create-group" class="btn" style="display:none; background: var(--green);"
+                                onclick="document.getElementById('create-group-form').style.display = document.getElementById('create-group-form').style.display==='none'?'block':'none'; document.getElementById('group-invite-result').style.display='none';">
+                            <i class="fa-solid fa-people-group"></i> 조 만들기
+                        </button>
+                        <button id="btn-join-group" class="btn" style="display:none;"
+                                onclick="document.getElementById('join-group-form').style.display = document.getElementById('join-group-form').style.display==='none'?'block':'none'">
+                            <i class="fa-solid fa-right-to-bracket"></i> 초대 코드로 조 참여
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 교수용: 강의 계획서 분석 -->
+                <div id="syllabus-upload-section" style="display:none; background:var(--ai-light); border:1px solid #d8b4fe; border-radius:10px; padding:18px 20px; margin-bottom:18px;">
+                    <strong style="color:#6b21a8; font-size:0.95rem;"><i class="fa-solid fa-book-open"></i> 강의 계획서 AI 분석</strong>
+                    <p style="margin:4px 0 10px 0; font-size:0.82rem; color:#7c3aed;">분석 후 주차 수·마일스톤이 자동 설정됩니다.</p>
+
+                    <!-- 탭 -->
+                    <div style="display:flex; gap:0; margin-bottom:14px; border:1px solid #d8b4fe; border-radius:8px; overflow:hidden; width:fit-content;">
+                        <button id="tab-file" onclick="switchSyllabusTab('file')"
+                                style="padding:7px 18px; font-size:0.85rem; background:var(--ai-color); color:white; border:none; cursor:pointer;">
+                            <i class="fa-solid fa-file-arrow-up"></i> 파일 업로드
+                        </button>
+                        <button id="tab-text" onclick="switchSyllabusTab('text')"
+                                style="padding:7px 18px; font-size:0.85rem; background:transparent; color:#6b21a8; border:none; cursor:pointer;">
+                            <i class="fa-solid fa-keyboard"></i> 직접 입력
+                        </button>
+                    </div>
+
+                    <!-- 파일 업로드 패널 -->
+                    <div id="syllabus-panel-file" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <label class="btn" style="background:var(--ai-color); cursor:pointer; padding:9px 18px; font-size:0.85rem; margin:0;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> 파일 선택 (PDF / TXT)
+                            <input type="file" id="syllabus-file-input" accept=".pdf,.txt" style="display:none;" onchange="uploadSyllabus(this)">
+                        </label>
+                        <span style="font-size:0.82rem; color:#7c3aed;">⚠ 스캔본 PDF는 직접 입력 탭을 이용하세요.</span>
+                    </div>
+
+                    <!-- 직접 입력 패널 -->
+                    <div id="syllabus-panel-text" style="display:none;">
+                        <textarea id="syllabus-text-input" rows="6"
+                                  placeholder="강의 계획서 내용을 여기에 붙여넣으세요.&#10;(주차별 일정, 프로젝트 마일스톤 등이 포함된 텍스트)"
+                                  style="width:100%; padding:10px; border:1px solid #d8b4fe; border-radius:8px; font-family:inherit; resize:vertical; box-sizing:border-box; font-size:0.88rem;"></textarea>
+                        <div style="text-align:right; margin-top:8px;">
+                            <button class="btn" style="background:var(--ai-color); font-size:0.85rem;" onclick="analyzeSyllabusText()">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI 분석하기
+                            </button>
+                        </div>
+                    </div>
+
+                    <span id="syllabus-status" style="display:block; margin-top:10px; font-size:0.82rem; color:#4c1d95; min-height:18px;"></span>
+                </div>
+
+                <!-- 교수용: AI 피드백 기준 자료 -->
+                <div id="course-ai-criteria-section" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:10px; margin-bottom:18px; overflow:hidden;">
+                    <!-- 헤더 (토글) -->
+                    <div onclick="toggleCriteriaSection()"
+                         style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; cursor:pointer; background:#fafafa; user-select:none;">
+                        <div>
+                            <strong style="color:var(--ai-color); font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+                                <i class="fa-solid fa-robot"></i> AI 피드백 기준 자료 관리
+                            </strong>
+                            <p style="margin:3px 0 0 0; font-size:0.8rem; color:var(--text-sub);">업로드된 자료를 AI가 학습하여 학생 보고서에 과목 맞춤 피드백을 생성합니다.</p>
+                        </div>
+                        <i id="criteria-toggle-icon" class="fa-solid fa-chevron-down" style="color:var(--text-sub); transition:0.2s;"></i>
+                    </div>
+
+                    <!-- 펼쳐지는 본문 -->
+                    <div id="criteria-section-body" style="display:none; padding:16px 20px 20px; border-top:1px solid var(--border);">
+                        <!-- 주차 선택 + 파일 업로드 -->
+                        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px;">
+                            <div style="display:flex; align-items:center; gap:8px; background:var(--ai-light); border:1px solid #d8b4fe; border-radius:8px; padding:7px 14px;">
+                                <label style="font-size:0.85rem; color:#6b21a8; font-weight:600; white-space:nowrap;"><i class="fa-solid fa-calendar-week"></i> 주차</label>
+                                <input type="number" id="course-upload-week-num" min="1" max="30" value="1"
+                                       style="width:55px; border:1px solid #d8b4fe; border-radius:6px; padding:3px 8px; font-size:1rem; font-weight:bold; text-align:center; color:#6b21a8; background:white;">
+                            </div>
+                            <label class="btn" style="background:var(--ai-color); cursor:pointer; margin:0; font-size:0.85rem; display:flex; align-items:center; gap:7px;">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 파일 업로드
+                                <input type="file" id="course-criteria-file-input" accept=".pdf,.txt,.xlsx" style="display:none;" onchange="uploadCourseCriteria(this)">
+                            </label>
+                            <span style="font-size:0.8rem; color:var(--text-sub);">PDF · TXT · XLSX</span>
+                        </div>
+
+                        <!-- 학습된 자료 목록 -->
+                        <div style="background:#f8f9fa; border-radius:8px; padding:14px; border:1px solid var(--border);">
+                            <div style="font-weight:600; font-size:0.88rem; color:var(--text-main); margin-bottom:10px;">
+                                <i class="fa-solid fa-list-check" style="color:var(--green);"></i> 이 과목의 학습된 자료
+                            </div>
+                            <div id="course-criteria-list-container">
+                                <p style="color:#94a3b8; text-align:center; font-size:0.88rem; margin:8px 0;">불러오는 중...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 내 조 안내 -->
+                <div id="my-group-info" style="display:none; background:var(--token-bg); border:1px solid #ffe082; border-radius:8px; padding:12px 18px; margin-bottom:18px; font-size:0.92rem; color:var(--token-text);"></div>
+
+                <!-- 조 만들기 폼 -->
+                <div id="create-group-form" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:25px; margin-bottom:20px;">
+                    <h3 style="margin-top:0;">새 조 만들기</h3>
+                    <input type="text" id="new-group-name" class="input-field" placeholder="조 이름을 입력하세요 (예: 1조, 알파팀)">
+                    <div style="text-align:right; margin-top:5px;">
+                        <button class="btn btn-outline" style="margin-right:10px;" onclick="document.getElementById('create-group-form').style.display='none'">취소</button>
+                        <button class="btn" style="background:var(--green);" onclick="createGroup()"><i class="fa-solid fa-wand-magic-sparkles"></i> 생성 및 초대 코드 발급</button>
+                    </div>
+                    <!-- 생성 후 초대 코드 표시 -->
+                    <div id="group-invite-result" style="display:none; margin-top:20px; background:var(--token-bg); border:1px dashed var(--token-text); border-radius:10px; padding:20px; text-align:center;">
+                        <p style="margin:0 0 8px 0; color:var(--token-text); font-weight:600;"><i class="fa-solid fa-party-horn"></i> "<span id="group-result-name"></span>" 조가 생성되었습니다!</p>
+                        <p style="margin:0 0 12px 0; color:var(--text-sub); font-size:0.9rem;">팀원들에게 아래 초대 코드를 공유하세요.</p>
+                        <div style="font-size:2rem; font-weight:800; letter-spacing:8px; color:var(--primary); margin-bottom:12px;" id="group-result-code"></div>
+                        <button class="btn" style="background:var(--token-text);" onclick="copyGroupInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
+                    </div>
+                </div>
+
+                <!-- 초대 코드로 조 참여 폼 -->
+                <div id="join-group-form" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:25px; margin-bottom:20px;">
+                    <h3 style="margin-top:0;">초대 코드로 조 참여</h3>
+                    <div style="display:flex; gap:10px; align-items:flex-start;">
+                        <input type="text" id="join-group-code" class="input-field" style="margin:0; flex:1; text-transform:uppercase; letter-spacing:3px; font-size:1.1rem; font-weight:bold;" placeholder="초대 코드 6자리" maxlength="6">
+                        <button class="btn" style="padding:12px 20px; white-space:nowrap;" onclick="joinGroup()"><i class="fa-solid fa-right-to-bracket"></i> 참여하기</button>
+                    </div>
+                </div>
+
+                <!-- 조 목록 -->
+                <div id="group-dynamic-list"></div>
+            </div>
+
             <div id="view-ai-upload" class="view">
-                <h2 style="margin-top: 0;"><i class="fa-solid fa-robot" style="color: var(--ai-color);"></i> AI 자동 피드백 기준 자료 관리</h2>
-                <div class="card">
-                    <h3 style="margin-top: 0;">주차별 강의자료 및 채점 루브릭 업로드</h3>
-                    <p style="color: var(--text-sub); margin-bottom: 25px;">업로드된 강의 내용과 교수님의 평가 기준을 AI가 학습하여, 학생들의 주차별 결과물에 대해 일관성 있고 정확한 피드백을 자동으로 생성합니다.</p>
-                    
-            <div class="upload-area" onclick="document.getElementById('hidden-file-input').click()">
-                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 3.5rem; color: var(--ai-color); margin-bottom: 15px;"></i>
-                <h4 style="margin: 0 0 5px 0; color: #4c1d95;">파일을 이곳으로 드래그하거나 클릭하여 업로드</h4>
-                <p style="margin: 0; font-size: 0.9rem; color: #6b21a8;">지원 형식: PDF, TXT (최대 50MB)</p> </div>
+                <!-- 헤더: 현재 과목 표시 -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 style="margin:0;"><i class="fa-solid fa-robot" style="color:var(--ai-color);"></i> AI 피드백 기준 자료</h2>
+                    <span id="ai-upload-course-name" style="background:var(--ai-light); border:1px solid #d8b4fe; padding:6px 16px; border-radius:20px; color:#6b21a8; font-size:0.9rem; font-weight:600;"></span>
+                </div>
 
-            <input type="file" id="hidden-file-input" style="display: none;" onchange="uploadProfessorFile(this)">
+                <!-- 과목 미선택 안내 -->
+                <div id="ai-upload-no-course" style="display:none; text-align:center; padding:50px 20px; color:var(--text-sub);">
+                    <i class="fa-solid fa-circle-info" style="font-size:2.5rem; color:#d8b4fe; margin-bottom:15px; display:block;"></i>
+                    <p style="font-size:1rem; margin:0 0 10px 0;">과목을 먼저 선택해주세요.</p>
+                    <p style="font-size:0.88rem; margin:0;">"나의 과목"에서 과목 홈에 진입한 후 이 메뉴를 클릭하면 해당 과목의 자료를 관리할 수 있습니다.</p>
+                </div>
 
-                    <div id="criteria-list-wrapper" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
-                        <div style="font-weight: bold; margin-bottom: 10px; font-size: 0.95rem;">학습 완료된 자료 목록</div>
+                <!-- 업로드 컨텐츠 (과목 선택 시 표시) -->
+                <div id="ai-upload-content" class="card">
+                    <h3 style="margin-top:0;">주차별 강의자료 및 채점 루브릭 업로드</h3>
+                    <p style="color:var(--text-sub); margin-bottom:20px;">업로드된 자료를 AI가 학습하여 학생 결과물에 대한 일관성 있는 피드백을 자동 생성합니다.</p>
+
+                    <!-- 주차 선택 + 파일 업로드 -->
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap;">
+                        <div style="display:flex; align-items:center; gap:8px; background:#f5f3ff; border:1px solid #d8b4fe; border-radius:8px; padding:8px 14px;">
+                            <label style="font-size:0.9rem; color:#6b21a8; font-weight:600; white-space:nowrap;"><i class="fa-solid fa-calendar-week"></i> 주차</label>
+                            <input type="number" id="upload-week-num" min="1" max="20" value="1"
+                                   style="width:60px; border:1px solid #d8b4fe; border-radius:6px; padding:4px 8px; font-size:1rem; font-weight:bold; text-align:center; color:#6b21a8; background:white;">
+                            <span style="font-size:0.88rem; color:#7c3aed;">주차 자료</span>
+                        </div>
+                        <label class="btn" style="background:var(--ai-color); cursor:pointer; margin:0; display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> 파일 선택 및 업로드
+                            <input type="file" id="hidden-file-input" accept=".pdf,.txt,.xlsx" style="display:none;" onchange="uploadProfessorFile(this)">
+                        </label>
+                        <span style="font-size:0.82rem; color:var(--text-sub);">PDF · TXT · XLSX 지원</span>
+                    </div>
+
+                    <!-- 학습 완료 목록 -->
+                    <div id="criteria-list-wrapper" style="background:#f8f9fa; padding:15px; border-radius:8px; border:1px solid var(--border);">
+                        <div style="font-weight:bold; margin-bottom:10px; font-size:0.95rem; color:var(--text-main);">
+                            <i class="fa-solid fa-list-check" style="color:var(--green);"></i> 학습 완료된 자료 목록
+                        </div>
                         <div id="criteria-list-container">
-                            <!-- 업로드된 자료 목록이 여기에 동적으로 표시됩니다 -->
-                            <p style="color: #94a3b8; text-align: center; font-size: 0.9rem;">자료를 불러오는 중...</p>
+                            <p style="color:#94a3b8; text-align:center; font-size:0.9rem;">자료를 불러오는 중...</p>
                         </div>
                     </div>
                 </div>
@@ -249,46 +404,73 @@
                 <button onclick="goBackToDashboard()" style="background:none; color:var(--text-sub); margin-bottom:15px; padding:0; font-size:0.9rem;"><i class="fa-solid fa-arrow-left"></i> 대시보드로 돌아가기</button>
                 
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
-                    <h2 style="margin:0; font-size: 1.6rem;">1조 상세 현황</h2>
+                    <h2 id="team-detail-title" style="margin:0; font-size: 1.6rem;">조 상세 현황</h2>
                     <span class="display-user-tokens" style="background: var(--surface); border: 1px solid var(--border); padding: 5px 15px; border-radius: 20px; font-weight: bold; color: var(--primary);"></span>
                 </div>
 
                 <div class="card" style="padding-bottom: 10px;">
                     <h3 style="margin-top: 0; font-size: 1.2rem;">프로젝트 스토리라인</h3>
-                    <div class="timeline">
-                        <div class="timeline-step step-completed"><div class="step-dot"><i class="fa-solid fa-check"></i></div><div class="step-label">아이디어 도출</div></div>
-                        <div class="timeline-step step-completed"><div class="step-dot"><i class="fa-solid fa-check"></i></div><div class="step-label">UI/UX 설계</div></div>
-                        <div class="timeline-step step-active"><div class="step-dot">3</div><div class="step-label">프론트/백엔드 구현</div></div>
-                        <div class="timeline-step"><div class="step-dot" style="background: white; color: #ccc;">4</div><div class="step-label">통합 테스트</div></div>
-                        <div class="timeline-step"><div class="step-dot" style="background: white; color: #ccc;">5</div><div class="step-label">최종 발표</div></div>
-                    </div>
-                    <button id="student-milestone-btn" class="btn" style="width: 100%; background: var(--green); margin-bottom: 15px; display: none; border-radius: 8px;" onclick="triggerConfetti()">
-                        <i class="fa-solid fa-flag-checkered"></i> 현재 마일스톤(구현) 완료 및 업데이트 보고 (+50 토큰 획득)
+                    <!-- 동적으로 채워짐 (renderTimeline) -->
+                    <div id="timeline-container" class="timeline"></div>
+
+                    <!-- 학생: 완료 보고 버튼 -->
+                    <button id="student-milestone-btn" class="btn"
+                            style="width:100%; background:var(--green); margin-bottom:10px; border-radius:8px; display:none;"
+                            onclick="requestMilestone()">
+                        <i class="fa-solid fa-flag-checkered"></i> 마일스톤 완료 보고
                     </button>
+
+                    <!-- 학생: 승인 대기 / 완료 안내 -->
+                    <div id="milestone-pending-info"
+                         style="display:none; align-items:center; gap:10px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:12px 16px; margin-bottom:10px; color:#92400e; font-size:0.9rem;">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                        <span></span>
+                    </div>
+
+                    <!-- 교수: 승인 / 반려 패널 -->
+                    <div id="prof-milestone-approval"
+                         style="display:none; align-items:center; gap:12px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:8px; padding:12px 16px; margin-bottom:10px;">
+                        <i class="fa-solid fa-circle-check" style="color:#059669; font-size:1.2rem;"></i>
+                        <span style="flex:1; color:#065f46; font-size:0.9rem;">
+                            <strong id="pending-milestone-label"></strong> 마일스톤 완료 보고가 접수되었습니다.
+                        </span>
+                        <button class="btn" style="background:#059669; padding:7px 16px; font-size:0.85rem;" onclick="approveMilestone()">승인</button>
+                        <button class="btn" style="background:var(--red); padding:7px 16px; font-size:0.85rem;" onclick="rejectMilestone()">반려</button>
+                    </div>
                 </div>
 
-                <div class="content-grid">
-                    <div class="qa-box">
-                        <h3><i class="fa-solid fa-circle-question"></i> To. Professor (Top 3)</h3>
-                        <p>교수님과의 다음 면담에서 꼭 해결해야 할 핵심 질문입니다.</p>
-                        <ol>
-                            <li>사용자 인증 토큰 만료 시 Refresh 로직 설계 검토 부탁드립니다.</li>
-                            <li>레퍼런스 마켓 데이터베이스 조인 성능을 높일 방법이 궁금합니다.</li>
-                            <li>게이미피케이션 요소가 학업 성취도에 미치는 영향 논문 레퍼런스가 있을까요?</li>
-                        </ol>
+                <!-- 팀 노션 페이지 카드 -->
+                <div class="card" id="notion-card" style="margin-bottom: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <h3 style="margin:0; display:flex; align-items:center; gap:8px;">
+                            <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;"><rect width="100" height="100" rx="18" fill="#000"/><path d="M24 18.4c3.3-.3 7.3.1 9.9 2.2l37.4 27.2c.8.6 1.4 1 1.4 2.2v30.9c0 2.5-1.3 3.6-4.1 3.8L27 86.9c-2.4.2-3.5-.6-4.8-2.4L16 75.7V23c0-2.8 1.7-4.3 8-4.6z" fill="#fff"/><path d="M33.9 20.6L71.3 47.8c.8.6 1.4 1 1.4 2.2v30.9c0 2.5-1.3 3.6-4.1 3.8" stroke="#000" stroke-width="3"/><path d="M24 18.4c-.2 3.9 1.8 5 4.9 7.1l35.4 25.5V47" stroke="#000" stroke-width="3"/></svg>
+                            팀 노션 페이지
+                        </h3>
+                        <a id="notion-open-btn" href="#" target="_blank" rel="noopener"
+                           style="display:none; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); color:var(--primary); padding:6px 14px; border-radius:20px; font-size:0.85rem; font-weight:600; text-decoration:none; transition:0.2s;"
+                           onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='var(--surface)'">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> 노션 열기
+                        </a>
                     </div>
 
-                    <div class="feedback-box">
-                        <h3><i class="fa-solid fa-rotate"></i> Previous & Current Feedback Loop</h3>
-                        <div class="feedback-past">
-                            <div style="font-size: 0.85rem; margin-bottom: 5px;">지난 면담 (4/18) - 교수님 코멘트</div>
-                            <div>"UI는 깔끔한데, 사용자 데이터 로딩 시 스켈레톤 UI를 도입해서 체감 속도를 높여보세요."</div>
+                    <!-- 학생: URL 입력 -->
+                    <div id="notion-input-wrapper" style="display:none; margin-bottom:14px;">
+                        <div style="display:flex; gap:8px; align-items:stretch;">
+                            <input type="url" id="notion-url-input" class="input-field"
+                                   placeholder="Notion 페이지 URL을 붙여넣으세요  (https://notion.so/...)"
+                                   style="margin:0; flex:1; font-size:0.9rem;">
+                            <button id="notion-submit-btn" class="btn" onclick="submitNotionLink()"
+                                    style="background:var(--primary); white-space:nowrap; padding:0 18px;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI 요약
+                            </button>
                         </div>
-                        <div class="feedback-current">
-                            <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; margin-bottom: 5px;">현재 반영 결과 (4/25)</div>
-                            <div>스켈레톤 UI 적용 완료했습니다. 초기 로딩 시 깜빡임 현상을 CSS 애니메이션으로 제어하여 해결했습니다.<br><span style="color: #777; font-size: 0.85rem;">(Commit: #a1b2c3d)</span></div>
-                        </div>
+                        <p style="margin:8px 0 0 0; font-size:0.8rem; color:var(--text-sub);">
+                            <i class="fa-solid fa-circle-info"></i> Notion 페이지가 <strong>공개(Publish to web)</strong> 상태여야 AI가 내용을 읽을 수 있습니다.
+                        </p>
                     </div>
+
+                    <!-- 요약 결과 표시 (학생 + 교수 공통) -->
+                    <div id="notion-summary-display"></div>
                 </div>
 
                 <div class="section-divider"></div>
@@ -302,18 +484,15 @@
                 </div>
 
                 <div class="week-tabs-container">
-                    <div class="week-tabs">
-                        <div class="week-circle active">01</div><div class="week-circle">02</div><div class="week-circle">03</div>
-                        <div class="week-circle">04</div><div class="week-circle">05</div><div class="week-circle">06</div>
-                    </div>
-                    <button class="btn" style="background: white; color: var(--text-sub); border: 1px solid var(--border);">모두 접기</button>
+                    <!-- 동적으로 채워짐 (renderWeekCircles) -->
+                    <div id="week-circles-container" class="week-tabs"></div>
                 </div>
 
                 <details open>
                     <summary>
-                        <div><i class="fa-solid fa-caret-down"></i> 1주차: 프로젝트 기획안 제출</div>
+                        <div><i class="fa-solid fa-caret-down"></i> <span id="weekly-detail-title">1주차</span></div>
                         <div style="font-size: 0.85rem; color: var(--primary); display: flex; align-items: center; gap: 10px;">
-                            <span>1/1</span> <span class="badge-blue">완료 ✓</span>
+                            <span id="weekly-detail-badge" class="badge-blue"></span>
                         </div>
                     </summary>
                     <div class="accordion-content">
