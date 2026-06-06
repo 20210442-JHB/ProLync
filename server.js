@@ -7,9 +7,10 @@ const express  = require('express');
 const mongoose = require('mongoose');
 const path     = require('path');
 const cors     = require('cors');
-const multer   = require('multer');
-const pdfParse = require('pdf-parse');
-const fs       = require('fs');
+const multer    = require('multer');
+const pdfParse  = require('pdf-parse');
+const fs        = require('fs');
+const puppeteer = require('puppeteer');
 
 if (!fs.existsSync('uploads/')) fs.mkdirSync('uploads/');
 
@@ -420,62 +421,42 @@ app.patch('/api/groups/:groupId/milestone-reject', async (req, res) => {
 
 // ── 노션 페이지 API ───────────────────────────────────────────────────────────
 
-// Notion 페이지 ID 추출 (URL에서 32자 hex 추출)
-function extractNotionPageId(url) {
-    const clean = url.split('?')[0];
-    const match = clean.match(/([a-f0-9]{32})$/i)
-                || clean.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
-    if (!match) return null;
-    return match[1].replace(/-/g, '');
-}
-
-// 32자 hex → UUID 포맷 (8-4-4-4-12)
-function toUUID(hex) {
-    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-}
-
-// 공식 Notion API — 블록 텍스트 변환
-function extractBlockText(block) {
-    const type = block.type;
-    const content = block[type];
-    if (!content) return '';
-    const text = (content.rich_text || []).map(t => t.plain_text).join('').trim();
-    if (!text && type !== 'divider') return '';
-    switch (type) {
-        case 'heading_1':           return `# ${text}`;
-        case 'heading_2':           return `## ${text}`;
-        case 'heading_3':           return `### ${text}`;
-        case 'bulleted_list_item':  return `• ${text}`;
-        case 'numbered_list_item':  return `1. ${text}`;
-        case 'to_do':               return `${content.checked ? '☑' : '☐'} ${text}`;
-        case 'quote':               return `> ${text}`;
-        case 'callout':             return `📌 ${text}`;
-        case 'toggle':              return `▶ ${text}`;
-        case 'code':                return `[코드] ${text}`;
-        case 'divider':             return '---';
-        default:                    return text;
-    }
-}
-
-// 공식 Notion API — 블록 목록 재귀 조회 (최대 depth 3)
-async function fetchNotionBlocks(blockId, notionKey, depth = 0) {
-    if (depth > 3) return [];
-    const res = await fetch(`https://api.notion.com/v1/blocks/${blockId}/children?page_size=100`, {
-        headers: { 'Authorization': `Bearer ${notionKey}`, 'Notion-Version': '2022-06-28' },
-        signal: AbortSignal.timeout(10000)
+async function scrapeNotionPage(url) {
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
-    if (!res.ok) throw new Error(`Notion API ${res.status}`);
-    const data = await res.json();
-    const lines = [];
-    for (const block of data.results) {
-        const text = extractBlockText(block);
-        if (text) lines.push(text);
-        if (block.has_children) {
-            const children = await fetchNotionBlocks(block.id, notionKey, depth + 1);
-            lines.push(...children.map(l => '  ' + l));
+    try {
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+        // 로그인 페이지로 리다이렉트된 경우 감지
+        const currentUrl = page.url();
+        if (currentUrl.includes('/login') || currentUrl.includes('notion.so/login')) {
+            throw new Error('LOGIN_REQUIRED');
         }
+
+        // Notion 콘텐츠 로딩 대기
+        await page.waitForSelector('.notion-page-content, .notion-scroller, [data-block-id]', { timeout: 15000 })
+            .catch(() => {}); // 셀렉터 없어도 계속 진행
+
+        const text = await page.evaluate(() => {
+            // 불필요한 UI 요소 제거 후 텍스트 추출
+            const remove = document.querySelectorAll('nav, .notion-topbar, .notion-sidebar, script, style, [aria-hidden="true"]');
+            remove.forEach(el => el.remove());
+
+            const content = document.querySelector('.notion-page-content')
+                         || document.querySelector('.notion-scroller')
+                         || document.querySelector('main')
+                         || document.body;
+            return content ? content.innerText.replace(/\n{3,}/g, '\n\n').trim() : '';
+        });
+
+        return text;
+    } finally {
+        await browser.close();
     }
-    return lines;
 }
 
 // 노션 페이지 등록 + AI 정리
@@ -483,45 +464,13 @@ app.post('/api/groups/:groupId/notion', async (req, res) => {
     const { notionUrl } = req.body;
     if (!notionUrl) return res.status(400).json({ message: 'Notion URL이 필요합니다.' });
 
-    const notionKey = process.env.NOTION_API_KEY;
-    if (!notionKey) {
-        return res.status(500).json({ message: 'NOTION_API_KEY가 서버에 설정되지 않았습니다. .env 파일을 확인해주세요.' });
-    }
-
-    const rawId = extractNotionPageId(notionUrl);
-    if (!rawId) {
-        return res.status(400).json({ message: 'URL에서 Notion 페이지 ID를 찾을 수 없습니다. 링크를 다시 확인해주세요.' });
-    }
-    const pageUUID = toUUID(rawId);
-
     try {
-        // 페이지 제목 가져오기
-        const pageRes = await fetch(`https://api.notion.com/v1/pages/${pageUUID}`, {
-            headers: { 'Authorization': `Bearer ${notionKey}`, 'Notion-Version': '2022-06-28' },
-            signal: AbortSignal.timeout(10000)
-        });
+        const extractedText = await scrapeNotionPage(notionUrl);
 
-        if (!pageRes.ok) {
-            if (pageRes.status === 404)
-                return res.status(400).json({ message: '페이지를 찾을 수 없습니다. Notion 페이지에 인테그레이션(연결)을 추가했는지 확인해주세요.' });
-            if (pageRes.status === 401 || pageRes.status === 403)
-                return res.status(400).json({ message: 'Notion API 인증 오류입니다. NOTION_API_KEY와 페이지 연결을 확인해주세요.' });
-            return res.status(400).json({ message: `Notion 페이지를 불러오지 못했습니다 (${pageRes.status}).` });
-        }
-
-        const pageData = await pageRes.json();
-        const titleArr = pageData.properties?.title?.title || pageData.properties?.Name?.title || [];
-        const pageTitle = titleArr.map(t => t.plain_text).join('') || '(제목 없음)';
-
-        // 블록 내용 가져오기
-        const blockLines = await fetchNotionBlocks(pageUUID, notionKey);
-        const extractedText = [`# ${pageTitle}`, ...blockLines].join('\n');
-
-        if (!extractedText.trim()) {
+        if (!extractedText || !extractedText.trim()) {
             return res.status(400).json({ message: '페이지에서 텍스트 내용을 찾지 못했습니다. 페이지에 내용이 있는지 확인해주세요.' });
         }
 
-        // AI 정리
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
@@ -549,7 +498,9 @@ app.post('/api/groups/:groupId/notion', async (req, res) => {
 
     } catch (err) {
         console.error('[Notion] Error:', err.message);
-        if (err.name === 'TimeoutError')
+        if (err.message === 'LOGIN_REQUIRED')
+            return res.status(403).json({ message: '이 Notion 페이지는 비공개 상태입니다. Notion에서 "Share with anyone" 또는 "Publish to web"으로 설정해주세요.' });
+        if (err.name === 'TimeoutError' || err.message.includes('timeout'))
             return res.status(408).json({ message: '페이지 로딩 시간이 초과됐습니다.' });
         res.status(500).json({ message: `서버 오류: ${err.message}` });
     }
