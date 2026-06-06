@@ -10,7 +10,6 @@ const cors     = require('cors');
 const multer    = require('multer');
 const pdfParse  = require('pdf-parse');
 const fs        = require('fs');
-const puppeteer = require('puppeteer');
 
 if (!fs.existsSync('uploads/')) fs.mkdirSync('uploads/');
 
@@ -422,41 +421,14 @@ app.patch('/api/groups/:groupId/milestone-reject', async (req, res) => {
 // ── 노션 페이지 API ───────────────────────────────────────────────────────────
 
 async function scrapeNotionPage(url) {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    const jinaUrl = `https://r.jina.ai/${url}`;
+    const res = await fetch(jinaUrl, {
+        headers: { 'Accept': 'text/plain', 'X-Return-Format': 'markdown' },
+        signal: AbortSignal.timeout(30000)
     });
-    try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-
-        // 로그인 페이지로 리다이렉트된 경우 감지
-        const currentUrl = page.url();
-        if (currentUrl.includes('/login') || currentUrl.includes('notion.so/login')) {
-            throw new Error('LOGIN_REQUIRED');
-        }
-
-        // Notion 콘텐츠 로딩 대기
-        await page.waitForSelector('.notion-page-content, .notion-scroller, [data-block-id]', { timeout: 15000 })
-            .catch(() => {}); // 셀렉터 없어도 계속 진행
-
-        const text = await page.evaluate(() => {
-            // 불필요한 UI 요소 제거 후 텍스트 추출
-            const remove = document.querySelectorAll('nav, .notion-topbar, .notion-sidebar, script, style, [aria-hidden="true"]');
-            remove.forEach(el => el.remove());
-
-            const content = document.querySelector('.notion-page-content')
-                         || document.querySelector('.notion-scroller')
-                         || document.querySelector('main')
-                         || document.body;
-            return content ? content.innerText.replace(/\n{3,}/g, '\n\n').trim() : '';
-        });
-
-        return text;
-    } finally {
-        await browser.close();
-    }
+    if (res.status === 403 || res.status === 401) throw new Error('LOGIN_REQUIRED');
+    if (!res.ok) throw new Error(`페이지를 불러오지 못했습니다 (${res.status})`);
+    return await res.text();
 }
 
 // 노션 페이지 등록 + AI 정리
