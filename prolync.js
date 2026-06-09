@@ -3,6 +3,7 @@
         let currentUserName = '';
         let currentCourse = null;
         let currentGroup  = null;
+        let myGroupId     = null; // 현재 과목에서 본인이 속한 조 ID
         // 서버 주소 설정 (포트 번호 확인)
         const SERVER_URL = 'https://prolync-2he4.onrender.com';
 
@@ -605,6 +606,7 @@ async function login() {
                 ]);
                 const groups  = await groupsRes.json();
                 const myGroup = myGroupRes ? await myGroupRes.json() : null;
+                myGroupId = myGroup?._id || null;
 
                 // 학생: 조가 없을 때만 만들기/참여 버튼 표시
                 if (btnCreate) btnCreate.style.display = (currentRole === 'student' && !myGroup) ? 'flex' : 'none';
@@ -864,10 +866,11 @@ async function login() {
                 else       { openBtn.style.display = 'none'; }
             }
 
-            // 학생만 URL 입력 창 표시
+            // 학생 중 본인 조만 URL 입력 창 표시
+            const isMyGroup = currentRole !== 'student' || (myGroupId && currentGroup?._id === myGroupId);
             const inputWrapper = document.getElementById('notion-input-wrapper');
             if (inputWrapper) {
-                inputWrapper.style.display = currentRole === 'student' ? 'block' : 'none';
+                inputWrapper.style.display = (currentRole === 'student' && isMyGroup) ? 'block' : 'none';
                 if (link) {
                     const urlInput = document.getElementById('notion-url-input');
                     if (urlInput) urlInput.value = link;
@@ -886,7 +889,7 @@ async function login() {
                             <i class="fa-solid fa-robot" style="color:var(--ai-color);"></i>
                             <strong style="color:#6b21a8; font-size:0.9rem;">AI 요약</strong>
                             ${dateStr ? `<span style="font-size:0.78rem; color:var(--text-sub); margin-left:4px;">${dateStr} 기준</span>` : ''}
-                            ${currentRole === 'student' ? `<button onclick="submitNotionLink()" style="margin-left:auto; background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.78rem; padding:2px 10px; border-radius:10px; cursor:pointer;">재요약</button>` : ''}
+                            ${(currentRole === 'student' && myGroupId && currentGroup?._id === myGroupId) ? `<button onclick="submitNotionLink()" style="margin-left:auto; background:none; border:1px solid #d8b4fe; color:#7c3aed; font-size:0.78rem; padding:2px 10px; border-radius:10px; cursor:pointer;">재요약</button>` : ''}
                         </div>
                         <p style="margin:0; font-size:0.93rem; line-height:1.7; color:#4c1d95; white-space:pre-wrap;">${summary}</p>
                     </div>`;
@@ -941,6 +944,31 @@ async function login() {
         function showTeamDetail() {
             const titleEl = document.getElementById('team-detail-title');
             if (titleEl && currentGroup) titleEl.textContent = currentGroup.name + ' 상세 현황';
+
+            // 학생이 본인 조가 아닌 타 조를 볼 때는 읽기 전용
+            const isMyGroup = currentRole !== 'student' || (myGroupId && currentGroup?._id === myGroupId);
+
+            const editBtn       = document.getElementById('btn-edit-report');
+            const replyWrapper  = document.getElementById('student-reply-wrapper');
+            if (editBtn)      editBtn.style.display      = isMyGroup && currentRole === 'student' ? 'block' : (currentRole === 'prof' ? 'none' : 'none');
+            if (replyWrapper) replyWrapper.style.display = isMyGroup ? 'block' : 'none';
+
+            // 읽기 전용 배너 표시
+            let readonlyBanner = document.getElementById('readonly-group-banner');
+            if (!isMyGroup && currentRole === 'student') {
+                if (!readonlyBanner) {
+                    readonlyBanner = document.createElement('div');
+                    readonlyBanner.id = 'readonly-group-banner';
+                    readonlyBanner.style.cssText = 'background:#fef9c3; border:1px solid #fde047; border-radius:8px; padding:10px 16px; margin-bottom:14px; font-size:0.88rem; color:#854d0e; display:flex; align-items:center; gap:8px;';
+                    readonlyBanner.innerHTML = '<i class="fa-solid fa-eye"></i> 다른 조의 페이지입니다. 읽기 전용으로 열람 중입니다.';
+                    const detailView = document.getElementById('view-team-detail');
+                    detailView.insertBefore(readonlyBanner, detailView.children[1]);
+                }
+                readonlyBanner.style.display = 'flex';
+            } else if (readonlyBanner) {
+                readonlyBanner.style.display = 'none';
+            }
+
             const weekCount = getWeekCount();
             renderWeekCircles(weekCount);
             updateMilestoneUI();
