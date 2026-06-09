@@ -531,6 +531,84 @@ async function login() {
             }
         }
 
+        async function renderProfCommonSection(groups, courseId) {
+            const milestoneEl = document.getElementById('common-milestone-list');
+            const reportEl    = document.getElementById('common-report-status');
+            const summaryEl   = document.getElementById('common-ai-summary-text');
+            if (!milestoneEl || !reportEl || !summaryEl) return;
+
+            const milestoneCount = currentCourse?.syllabusAnalysis?.milestones?.length || 5;
+
+            // ── 마일스톤 진행 현황 ──
+            milestoneEl.innerHTML = groups.map(g => {
+                const done    = g.currentMilestoneIdx || 0;
+                const pct     = Math.round((done / milestoneCount) * 100);
+                const color   = g.milestoneStatus === 'all_completed' ? 'var(--green)'
+                              : g.milestoneStatus === 'pending_approval' ? '#f59e0b'
+                              : 'var(--primary)';
+                const badge   = g.milestoneStatus === 'pending_approval'
+                    ? '<span style="font-size:0.75rem;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:8px;margin-left:6px;">⏳ 승인 대기</span>' : '';
+                const label   = g.milestoneStatus === 'all_completed' ? '완료' : `${done}/${milestoneCount}`;
+                return `
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-size:0.88rem;font-weight:600;">${g.name}${badge}</span>
+                        <span style="font-size:0.82rem;color:var(--text-sub);">${label} &nbsp;<strong style="color:${color};">${pct}%</strong></span>
+                    </div>
+                    <div style="background:#e2e8f0;height:8px;border-radius:4px;overflow:hidden;">
+                        <div style="background:${color};width:${pct}%;height:100%;border-radius:4px;transition:width 0.4s;"></div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // ── 주차별 보고서 제출 현황 ──
+            try {
+                const rRes    = await fetch(`${SERVER_URL}/api/reports/status?courseId=${courseId}`);
+                const reports = await rRes.json();
+
+                const weeks   = [...new Set(reports.map(r => r.week))].sort((a, b) => a - b);
+                if (weeks.length === 0) {
+                    reportEl.innerHTML = '<p style="color:var(--text-sub);font-size:0.88rem;margin:0;">아직 제출된 보고서가 없습니다.</p>';
+                } else {
+                    const submittedSet = new Set(reports.map(r => `${r.groupId}_${r.week}`));
+                    const colW = `${Math.min(90, Math.floor(480 / (groups.length + 1)))}px`;
+                    let table = `<table style="border-collapse:collapse;font-size:0.82rem;min-width:100%;">
+                        <thead><tr>
+                            <th style="padding:6px 10px;text-align:left;color:var(--text-sub);font-weight:600;white-space:nowrap;">주차</th>
+                            ${groups.map(g => `<th style="padding:6px 8px;text-align:center;color:var(--text-sub);font-weight:600;min-width:${colW};white-space:nowrap;">${g.name}</th>`).join('')}
+                        </tr></thead><tbody>`;
+                    weeks.forEach((w, i) => {
+                        const bg = i % 2 === 0 ? '' : 'background:#f8fafc;';
+                        table += `<tr style="${bg}">
+                            <td style="padding:6px 10px;font-weight:600;white-space:nowrap;">${w}주차</td>
+                            ${groups.map(g => {
+                                const ok = submittedSet.has(`${g._id}_${w}`);
+                                return `<td style="padding:6px 8px;text-align:center;">
+                                    ${ok ? '<span style="color:#16a34a;font-size:1rem;">✓</span>'
+                                         : '<span style="color:#cbd5e1;font-size:0.9rem;">—</span>'}
+                                </td>`;
+                            }).join('')}
+                        </tr>`;
+                    });
+                    table += '</tbody></table>';
+                    reportEl.innerHTML = table;
+                }
+            } catch {
+                reportEl.innerHTML = '<p style="color:var(--text-sub);font-size:0.88rem;margin:0;">불러오기 실패</p>';
+            }
+
+            // ── AI 전체 분석 요약 ──
+            summaryEl.textContent = '분석 중...';
+            try {
+                const params = new URLSearchParams({ courseId });
+                const sRes   = await fetch(`${SERVER_URL}/api/reports/overall-summary?${params}`);
+                const sData  = await sRes.json();
+                summaryEl.textContent = sData.summary;
+            } catch {
+                summaryEl.textContent = '요약을 불러오는 데 실패했습니다.';
+            }
+        }
+
         async function requestSemesterFeedback() {
             if (!currentCourse?._id) return;
             const btn     = document.getElementById('semester-feedback-btn');
@@ -575,6 +653,9 @@ async function login() {
             if (aiCriteriaSection)       aiCriteriaSection.style.display       = currentRole === 'prof' ? 'block' : 'none';
             if (semesterFeedbackSection) semesterFeedbackSection.style.display = currentRole === 'prof' ? 'block' : 'none';
 
+            const profCommonSection = document.getElementById('prof-common-section');
+            if (profCommonSection) profCommonSection.style.display = currentRole === 'prof' ? 'block' : 'none';
+
             // 학생용 버튼 표시
             const btnCreate = document.getElementById('btn-create-group');
             const btnJoin   = document.getElementById('btn-join-group');
@@ -601,6 +682,10 @@ async function login() {
                     } else {
                         myInfoEl.style.display = 'none';
                     }
+                }
+
+                if (currentRole === 'prof' && Array.isArray(groups) && groups.length > 0) {
+                    renderProfCommonSection(groups, courseId);
                 }
 
                 listEl.innerHTML = '';

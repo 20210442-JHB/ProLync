@@ -528,6 +528,16 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
 
 // ── 보고서 API ────────────────────────────────────────────────────────────────
 
+// 과목 전체 보고서 제출 현황 (교수 공통 화면용)
+app.get('/api/reports/status', async (req, res) => {
+    const { courseId } = req.query;
+    if (!courseId) return res.status(400).json({ message: 'courseId가 필요합니다.' });
+    try {
+        const reports = await Report.find({ courseId }, 'week groupId title').lean();
+        res.json(reports);
+    } catch (err) { res.status(500).send(err.message); }
+});
+
 // 전체 분석 요약 — :week 보다 먼저 등록
 app.get('/api/reports/overall-summary', async (req, res) => {
     const { courseId, groupId } = req.query;

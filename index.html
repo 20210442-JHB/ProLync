@@ -238,6 +238,42 @@
                     </div>
                 </div>
 
+                <!-- 교수용: 전체 공통 현황 개요 -->
+                <div id="prof-common-section" style="display:none; margin-bottom:18px;">
+
+                    <!-- 마일스톤 진행 현황 -->
+                    <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px;">
+                        <div style="padding:13px 20px; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-list-check" style="color:var(--primary);"></i>
+                            <strong style="font-size:0.95rem;">전체 조 마일스톤 진행 현황</strong>
+                        </div>
+                        <div id="common-milestone-list" style="padding:16px 20px; display:flex; flex-direction:column; gap:10px;">
+                            <p style="color:var(--text-sub); font-size:0.88rem; margin:0;">불러오는 중...</p>
+                        </div>
+                    </div>
+
+                    <!-- 주차별 보고서 제출 현황 -->
+                    <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px;">
+                        <div style="padding:13px 20px; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-table" style="color:var(--primary);"></i>
+                            <strong style="font-size:0.95rem;">주차별 보고서 제출 현황</strong>
+                        </div>
+                        <div id="common-report-status" style="padding:16px 20px; overflow-x:auto;">
+                            <p style="color:var(--text-sub); font-size:0.88rem; margin:0;">불러오는 중...</p>
+                        </div>
+                    </div>
+
+                    <!-- AI 전체 분석 요약 -->
+                    <div style="background:var(--ai-light); border:1px solid #d8b4fe; border-radius:10px; padding:16px 20px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--ai-color);"></i>
+                            <strong style="color:#6b21a8; font-size:0.95rem;">AI 전체 진행 상황 분석</strong>
+                        </div>
+                        <p id="common-ai-summary-text" style="margin:0; font-size:0.9rem; line-height:1.7; color:#4c1d95;">분석 중...</p>
+                    </div>
+
+                </div>
+
                 <!-- 내 조 안내 -->
                 <div id="my-group-info" style="display:none; background:var(--token-bg); border:1px solid #ffe082; border-radius:8px; padding:12px 18px; margin-bottom:18px; font-size:0.92rem; color:var(--token-text);"></div>
 
