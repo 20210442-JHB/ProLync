@@ -3,10 +3,6 @@
         let currentUserName = '';
         let currentCourse = null;
         let currentGroup  = null;
-        let userTokens = 320; // 기본 학생 토큰
-        let mvpTokens = 500; // 이달의 MVP 기준 토큰 (예시 초기값)
-        let mvpUserName = '김철수'; // 이달의 MVP 이름 (예시 초기값)
-
         // 서버 주소 설정 (포트 번호 확인)
         const SERVER_URL = 'https://prolync-2he4.onrender.com';
 
@@ -76,45 +72,6 @@
 
             if (pushToHistory) {
                 history.pushState({ viewId: viewId }, "", "#" + viewId);
-            }
-        }
-
-        // 모든 토큰 텍스트 UI 업데이트
-        function updateTokenDisplay() {
-            document.getElementById('nav-tokens').innerText = `🪙 ${userTokens}`;
-            document.querySelectorAll('.display-user-tokens').forEach(el => {
-                el.innerText = `🪙 ${userTokens} 토큰`;
-            });
-        }
-
-        async function refreshMVP() {
-            try {
-                const res = await fetch(`${SERVER_URL}/api/users/mvp`);
-                const data = await res.json();
-                mvpTokens = data.tokens;
-                mvpUserName = data.name;
-
-                const mvpTokenEl = document.getElementById('mvp-token-count');
-                const mvpNameEl = document.getElementById('mvp-user-name');
-                if (mvpTokenEl) mvpTokenEl.innerText = `${mvpTokens} 토큰`;
-                if (mvpNameEl) mvpNameEl.innerText = mvpUserName;
-            } catch (error) {
-                console.error("MVP 정보를 불러오는데 실패했습니다.", error);
-            }
-        }
-
-        async function syncTokensWithDB(newAmount) {
-            userTokens = newAmount;
-            updateTokenDisplay();
-            try {
-                await fetch(`${SERVER_URL}/api/users/${currentUserId}/tokens`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tokens: userTokens })
-                });
-                await refreshMVP(); // DB 업데이트 후 MVP 정보도 다시 가져옴
-            } catch (error) {
-                console.error("토큰 동기화 실패:", error);
             }
         }
 
@@ -191,8 +148,7 @@ async function login() {
             return;
         }
 
-        userData = data; // 로그인 성공 시 유저 데이터 할당
-        userTokens = userData.tokens;
+        userData = data;
         currentUserId = userData.userId;
         currentUserName = userData.name || (role === 'prof' ? '교수자' : '학생');
 
@@ -211,24 +167,14 @@ async function login() {
     
     if(role === 'prof') {
         document.getElementById('user-info').innerText = userData.name || '교수자';
-        document.getElementById('nav-tokens').style.display = 'none';
-
         document.getElementById('student-milestone-btn').style.display = 'none';
-        document.getElementById('unlock-btn').style.display = 'none';
-        document.getElementById('unlocked-content').style.display = 'block';
         document.getElementById('btn-edit-report').style.display = 'none';
-
         document.getElementById('prof-ai-generate-form').style.display = 'block';
         document.getElementById('student-reply-wrapper').style.display = 'block';
     } else {
         document.getElementById('user-info').innerText = userData.name || '학생';
-        document.getElementById('nav-tokens').style.display = 'inline-block';
-
         document.getElementById('student-milestone-btn').style.display = 'block';
-        document.getElementById('unlock-btn').style.display = 'flex';
-        document.getElementById('unlocked-content').style.display = 'none';
         document.getElementById('btn-edit-report').style.display = 'block';
-
         document.getElementById('prof-ai-generate-form').style.display = 'none';
         document.getElementById('student-reply-wrapper').style.display = 'block';
     }
@@ -236,8 +182,6 @@ async function login() {
     document.getElementById('btn-create-course').style.display = role === 'prof' ? 'flex' : 'none';
     document.getElementById('btn-join-course').style.display = role === 'student' ? 'flex' : 'none';
 
-    updateTokenDisplay();
-    refreshMVP();
     loadReportData(1);
     loadMyCourses();
 
@@ -504,15 +448,7 @@ async function login() {
         }
 
         async function loadTotalTokens() {
-            const totalTokensEl = document.getElementById('total-cumulative-tokens');
-            if (!totalTokensEl) return;
-            try {
-                const res = await fetch(`${SERVER_URL}/api/users/total-tokens`);
-                const data = await res.json();
-                totalTokensEl.innerText = `${data.totalTokens.toLocaleString()} 토큰`;
-            } catch (error) {
-                console.error("누적 토큰 로드 실패:", error);
-            }
+            // 토큰 기능 제거됨
         }
 
         async function loadOverallSummary() {
@@ -890,7 +826,7 @@ async function login() {
                 if (status === 'active' && currentIdx < milestones.length) {
                     if (milestoneBtn) {
                         milestoneBtn.style.display = 'block';
-                        milestoneBtn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> [${currentLabel}] 마일스톤 완료 보고 (+50 토큰)`;
+                        milestoneBtn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> [${currentLabel}] 마일스톤 완료 보고`;
                     }
                     if (pendingEl) pendingEl.style.display = 'none';
                 } else if (status === 'pending_approval') {
@@ -1024,8 +960,6 @@ async function login() {
                 });
                 if (res.ok) {
                     currentGroup = await res.json();
-                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-                    syncTokensWithDB(userTokens + 50);
                     setTimeout(() => updateMilestoneUI(), 400);
                 } else { alert('요청에 실패했습니다.'); }
             } catch { alert('서버 오류가 발생했습니다.'); }
@@ -1225,10 +1159,6 @@ async function saveReport() {
             loadReportData(currentWeek); // DB에서 전체 데이터를 다시 불러와 UI 갱신 (댓글 포함)
             toggleEditMode(); // 수정 모드 닫기
             
-            // 축하 이펙트 (인덱스에 선언된 폭죽 효과 실행!)
-            if (typeof confetti === 'function') {
-                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-            }
         } else {
             alert("오류 발생: " + data.error);
         }
@@ -1599,21 +1529,6 @@ function clearReportUI() {
             } catch { alert('서버 오류가 발생했습니다.'); }
         }
 
-        // 마일스톤 폭죽 연출 및 토큰 획득
-        function triggerConfetti() {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-            syncTokensWithDB(userTokens + 50);
-            setTimeout(() => alert("🎉 마일스톤 업데이트 완료! (+50 토큰 획득)"), 500);
-        }
-
-        // 토큰 사용 로직
-        function unlockReference() {
-            if(confirm("🪙 50 토큰을 사용하여 [Refresh Token 구현 사례]를 열람하시겠습니까?")) {
-                syncTokensWithDB(userTokens - 50);
-                document.getElementById('unlock-btn').style.display = 'none';
-                document.getElementById('unlocked-content').style.display = 'block';
-            }
-        }
         
         async function uploadProfessorFile(inputElement) {
             const file = inputElement.files[0];

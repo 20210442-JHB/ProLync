@@ -51,8 +51,7 @@ const UserSchema = new mongoose.Schema({
     userId:   { type: String, required: true, unique: true },
     password: { type: String, required: true },
     name:  String,
-    role:  String,
-    tokens: { type: Number, default: 320 }
+    role:  String
 });
 
 const ReportSchema = new mongoose.Schema({
@@ -140,7 +139,7 @@ app.post('/api/signup', async (req, res) => {
     try {
         if (await User.findOne({ userId }))
             return res.status(400).json({ message: "이미 존재하는 학번/교번입니다." });
-        await new User({ userId, password, name: name || "신규 가입자", role: role || "student", tokens: role === 'prof' ? 0 : 320 }).save();
+        await new User({ userId, password, name: name || "신규 가입자", role: role || "student" }).save();
         res.json({ message: "회원가입이 완료되었습니다! 로그인해 주세요." });
     } catch (err) { res.status(500).send(err.message); }
 });
@@ -156,24 +155,6 @@ app.post('/api/login', async (req, res) => {
     } catch (err) { res.status(500).send(err.message); }
 });
 
-app.patch('/api/users/:userId/tokens', async (req, res) => {
-    try {
-        const user = await User.findOneAndUpdate({ userId: req.params.userId }, { tokens: req.body.tokens }, { new: true, upsert: true });
-        res.json(user);
-    } catch (err) { res.status(500).send(err.message); }
-});
-
-app.get('/api/users/mvp', async (req, res) => {
-    try { res.json(await User.findOne().sort({ tokens: -1 }) || { name: '없음', tokens: 0 }); }
-    catch (err) { res.status(500).send(err.message); }
-});
-
-app.get('/api/users/total-tokens', async (req, res) => {
-    try {
-        const result = await User.aggregate([{ $group: { _id: null, total: { $sum: "$tokens" } } }]);
-        res.json({ totalTokens: result.length > 0 ? result[0].total : 0 });
-    } catch (err) { res.status(500).send(err.message); }
-});
 
 // ── 과목 API ──────────────────────────────────────────────────────────────────
 

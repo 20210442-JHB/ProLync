@@ -17,7 +17,6 @@
         </div>
         <div class="nav-right">
             <span id="user-info">사용자 이름</span>
-            <span id="nav-tokens" style="display:none; background: var(--token-bg); color: var(--token-text); padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 0.9rem;"></span>
             <button class="logout-btn" onclick="logout()">로그아웃</button>
         </div>
     </nav>
@@ -53,12 +52,6 @@
             <div class="radio-group">
                 <label><input type="radio" name="role" value="student" checked> 학생</label>
                 <label><input type="radio" name="role" value="prof"> 교수자</label>
-            </div>
-
-            <div style="background: var(--token-bg); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed var(--token-text); text-align: left;">
-                <label style="font-size: 0.95rem; font-weight: bold; color: var(--token-text); display: block; margin-bottom: 8px;">🎁 추천인 코드 (선택)</label>
-                <input type="text" id="signup-ref" class="input-field" style="margin-bottom: 8px;" placeholder="추천인 코드를 입력하세요">
-                <span style="font-size: 0.85rem; color: #d97706;"><i class="fa-solid fa-gift"></i> 코드를 입력하시면 가입 즉시 <b>100 토큰</b>을 드립니다!</span>
             </div>
 
             <button class="role-btn" style="background: var(--green);" onclick="processSignup()">가입하기</button>
@@ -99,11 +92,11 @@
                         <button class="btn" onclick="createCourse()"><i class="fa-solid fa-wand-magic-sparkles"></i> 생성 및 초대 코드 발급</button>
                     </div>
                     <!-- 생성 후 초대 코드 표시 -->
-                    <div id="invite-code-result" style="display: none; margin-top: 20px; background: var(--token-bg); border: 1px dashed var(--token-text); border-radius: 10px; padding: 20px; text-align: center;">
-                        <p style="margin: 0 0 8px 0; color: var(--token-text); font-weight: 600;"><i class="fa-solid fa-party-horn"></i> 과목 "<span id="result-course-title"></span>"이 생성되었습니다!</p>
+                    <div id="invite-code-result" style="display: none; margin-top: 20px; background: var(--ai-light); border: 1px dashed var(--primary); border-radius: 10px; padding: 20px; text-align: center;">
+                        <p style="margin: 0 0 8px 0; color: var(--primary); font-weight: 600;"><i class="fa-solid fa-party-horn"></i> 과목 "<span id="result-course-title"></span>"이 생성되었습니다!</p>
                         <p style="margin: 0 0 12px 0; color: var(--text-sub); font-size: 0.9rem;">학생들에게 아래 초대 코드를 공유하세요.</p>
                         <div style="font-size: 2rem; font-weight: 800; letter-spacing: 8px; color: var(--primary); margin-bottom: 12px;" id="result-invite-code"></div>
-                        <button class="btn" style="background: var(--token-text);" onclick="copyInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
+                        <button class="btn" onclick="copyInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
                     </div>
                 </div>
 
@@ -275,7 +268,7 @@
                 </div>
 
                 <!-- 내 조 안내 -->
-                <div id="my-group-info" style="display:none; background:var(--token-bg); border:1px solid #ffe082; border-radius:8px; padding:12px 18px; margin-bottom:18px; font-size:0.92rem; color:var(--token-text);"></div>
+                <div id="my-group-info" style="display:none; background:var(--ai-light); border:1px solid #d8b4fe; border-radius:8px; padding:12px 18px; margin-bottom:18px; font-size:0.92rem; color:var(--primary);"></div>
 
                 <!-- 조 만들기 폼 -->
                 <div id="create-group-form" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:25px; margin-bottom:20px;">
@@ -286,11 +279,11 @@
                         <button class="btn" style="background:var(--green);" onclick="createGroup()"><i class="fa-solid fa-wand-magic-sparkles"></i> 생성 및 초대 코드 발급</button>
                     </div>
                     <!-- 생성 후 초대 코드 표시 -->
-                    <div id="group-invite-result" style="display:none; margin-top:20px; background:var(--token-bg); border:1px dashed var(--token-text); border-radius:10px; padding:20px; text-align:center;">
-                        <p style="margin:0 0 8px 0; color:var(--token-text); font-weight:600;"><i class="fa-solid fa-party-horn"></i> "<span id="group-result-name"></span>" 조가 생성되었습니다!</p>
+                    <div id="group-invite-result" style="display:none; margin-top:20px; background:var(--ai-light); border:1px dashed var(--primary); border-radius:10px; padding:20px; text-align:center;">
+                        <p style="margin:0 0 8px 0; color:var(--primary); font-weight:600;"><i class="fa-solid fa-party-horn"></i> "<span id="group-result-name"></span>" 조가 생성되었습니다!</p>
                         <p style="margin:0 0 12px 0; color:var(--text-sub); font-size:0.9rem;">팀원들에게 아래 초대 코드를 공유하세요.</p>
                         <div style="font-size:2rem; font-weight:800; letter-spacing:8px; color:var(--primary); margin-bottom:12px;" id="group-result-code"></div>
-                        <button class="btn" style="background:var(--token-text);" onclick="copyGroupInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
+                        <button class="btn" onclick="copyGroupInviteCode()"><i class="fa-solid fa-copy"></i> 코드 복사</button>
                     </div>
                 </div>
 
@@ -355,112 +348,17 @@
 
             <div id="view-prof-dashboard" class="view">
                 <h2 style="margin-top: 0;">팀 현황 관제탑</h2>
-                
-                <div class="mvp-banner">
-                    <div class="banner-card token">
-                        <div class="banner-icon">🏆</div>
-                        <div class="banner-content">
-                            <h4>이달의 최다 토큰 MVP</h4>
-                            <p>1조 (조현빈 외) - 🪙 450</p>
-                        </div>
-                    </div>
-                    <div class="banner-card speed">
-                        <div class="banner-icon">🚀</div>
-                        <div class="banner-content">
-                            <h4>가장 빠른 진도율</h4>
-                            <p>1조 - 마일스톤 [구현] 달성</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">전체 조 진행 상황</h3>
-                    <span style="font-size: 0.85rem; color: var(--text-sub);">클릭하여 각 조의 상세 내용을 확인하세요.</span>
-                </div>
-
-                <div class="team-grid">
-                    <div class="card team-card green" onclick="showTeamDetail()">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="margin:0;">1조 (조현빈 외 3명)</h3>
-                            <span style="color:var(--green); font-weight:bold;">🟢 정상 진행</span>
-                        </div>
-                        <p style="font-size: 0.9rem; margin-bottom: 5px;">현재 단계: 프론트/백엔드 구현 완료 (60%)</p>
-                        <p style="font-size: 0.9rem; font-weight: bold; color: var(--token-text); margin: 0;">🪙 누적: 450</p>
-                    </div>
-                    <div class="card team-card yellow">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-                            <h3 style="margin:0;">2조 (김철수 외 4명)</h3>
-                            <span style="color:var(--yellow); font-weight:bold;">🟡 지연됨</span>
-                        </div>
-                        <p style="font-size: 0.9rem; margin-bottom: 5px;">현재 단계: 기획 보류중 (20%)</p>
-                        <p style="font-size: 0.9rem; font-weight: bold; color: var(--token-text); margin: 0;">🪙 누적: 210</p>
-                    </div>
-                </div>
             </div>
 
             <div id="view-student-dashboard" class="view">
                 <h2 style="margin-top: 0;">내 프로젝트 대시보드</h2>
-
-                <div class="mvp-banner">
-                    <div class="banner-card speed">
-                        <div class="banner-icon">🚀</div>
-                        <div class="banner-content">
-                            <h4>축하합니다! 우리 팀이 현재 과목 진도율 1위입니다.</h4>
-                            <p>마일스톤 [구현] 달성 완료</p>
-                        </div>
-                    </div>
-                </div>
-
-                <h3 style="border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;"><i class="fa-solid fa-star" style="color: var(--yellow);"></i> 나의 소속 조</h3>
-                
-                <div class="card team-card green" style="cursor: pointer; border-left: 5px solid var(--green); transform: scale(1.02); margin: 0 10px 40px 10px;" onclick="showTeamDetail()">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 15px;">
-                        <h3 style="margin:0;"><i class="fa-solid fa-users" style="color: var(--primary);"></i> 1조 (조현빈 외 3명)</h3>
-                        <button class="btn">상세 진행상황 및 피드백 보기 <i class="fa-solid fa-arrow-right"></i></button>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <p style="margin:0;"><strong>최근 상태:</strong> <span style="color:var(--green); font-weight:bold;">🟢 정상 진행 중</span></p>
-                        <p style="margin:0; font-weight: bold; color: var(--token-text);" class="display-user-tokens"></p>
-                    </div>
-                    <p style="color: var(--text-sub); font-size: 0.9rem; margin-top: 10px;">💬 AI 자동 피드백(교수님 기준) 1건이 도착했습니다.</p>
-                </div>
-
-                <h3 style="border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px;">타 조 진행 현황 <span style="font-size: 0.85rem; color: var(--text-sub); font-weight: normal;">(진도율 순)</span></h3>
-                
-                <div class="other-teams-list">
-                    <div class="other-team-item">
-                        <div style="font-weight: bold; width: 140px; font-size: 1.1rem;">3조 (박지은 외)</div>
-                        <div class="other-team-progress">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-sub);">
-                                <span>마일스톤 [통합 테스트] 진행중</span> <strong>80%</strong>
-                            </div>
-                            <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div style="background: var(--primary); width: 80%; height: 100%;"></div>
-                            </div>
-                        </div>
-                        <div style="font-weight: bold; color: var(--token-text); width: 100px; text-align: right; font-size: 1.1rem;">🪙 390</div>
-                    </div>
-                    <div class="other-team-item">
-                        <div style="font-weight: bold; width: 140px; font-size: 1.1rem;">2조 (김철수 외)</div>
-                        <div class="other-team-progress">
-                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-sub);">
-                                <span>마일스톤 [기획 보류]</span> <strong>30%</strong>
-                            </div>
-                            <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div style="background: var(--yellow); width: 30%; height: 100%;"></div>
-                            </div>
-                        </div>
-                        <div style="font-weight: bold; color: var(--token-text); width: 100px; text-align: right; font-size: 1.1rem;">🪙 210</div>
-                    </div>
-                </div>
             </div>
 
             <div id="view-team-detail" class="view">
                 <button onclick="goBackToDashboard()" style="background:none; color:var(--text-sub); margin-bottom:15px; padding:0; font-size:0.9rem;"><i class="fa-solid fa-arrow-left"></i> 대시보드로 돌아가기</button>
                 
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                <div style="margin-bottom: 20px;">
                     <h2 id="team-detail-title" style="margin:0; font-size: 1.6rem;">조 상세 현황</h2>
-                    <span class="display-user-tokens" style="background: var(--surface); border: 1px solid var(--border); padding: 5px 15px; border-radius: 20px; font-weight: bold; color: var(--primary);"></span>
                 </div>
 
                 <div class="card" style="padding-bottom: 10px;">
@@ -599,18 +497,6 @@
                                 </div>
                             </div>
 
-                            <button id="unlock-btn" class="token-unlock-btn" onclick="unlockReference()">
-                                <i class="fa-solid fa-lock"></i> 🪙 50 토큰으로 타 팀 유사사례(Refresh Token) 보기
-                            </button>
-
-                            <div id="unlocked-content" class="unlocked-reference">
-                                <h4 style="margin-top:0; color: #f57f17; font-size: 1.05rem;"><i class="fa-solid fa-lock-open"></i> [해결책 해금 완료] Refresh Token 구현 사례</h4>
-                                <p style="font-size: 0.95rem; color: var(--text-main); margin-bottom: 5px;"><strong>이전 학기 MVP 팀의 해결 방식:</strong></p>
-                                <p style="font-size: 0.9rem; color: #555; line-height: 1.6;">
-                                    "Access Token의 수명은 15분으로 짧게 잡고, Refresh Token(수명 14일)을 HttpOnly 쿠키에 저장하여 XSS 공격을 방지했습니다. 프론트엔드에서는 axios interceptor를 활용해 401 에러 발생 시 백그라운드에서 조용히 토큰을 갱신하도록 구성하여 UX를 개선했습니다."
-                                </p>
-                                <a href="#" style="color: var(--primary); font-size: 0.9rem; text-decoration: underline;"><i class="fa-solid fa-link"></i> 관련 GitHub 코드 스니펫 보러가기</a>
-                            </div>
                         </div>
                         
                         <div id="prof-ai-generate-form" style="margin-top: 15px; display: none; background: var(--ai-light); border: 1px solid #d8b4fe; padding: 20px; border-radius: 8px;">
