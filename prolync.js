@@ -531,6 +531,30 @@ async function login() {
             }
         }
 
+        async function requestSemesterFeedback() {
+            if (!currentCourse?._id) return;
+            const btn     = document.getElementById('semester-feedback-btn');
+            const result  = document.getElementById('semester-feedback-result');
+            const textEl  = document.getElementById('semester-feedback-text');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 분석 중...';
+            if (result) result.style.display = 'none';
+
+            try {
+                const res  = await fetch(`${SERVER_URL}/api/courses/${currentCourse._id}/semester-feedback`);
+                const data = await res.json();
+                if (!res.ok) { alert(`오류: ${data.message}`); return; }
+                textEl.innerText = data.feedback;
+                result.style.display = 'block';
+            } catch {
+                alert('서버에 연결할 수 없습니다.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> 재분석';
+            }
+        }
+
         // ── 조(Group) 관련 함수 ───────────────────────────────────────────
 
         // 조 목록 로드 및 렌더링
@@ -544,10 +568,12 @@ async function login() {
             listEl.innerHTML = '<p style="color:var(--text-sub);text-align:center;padding:20px;">불러오는 중...</p>';
 
             // 강의계획서 + AI 기준 섹션 표시 (교수만)
-            const syllabusSection   = document.getElementById('syllabus-upload-section');
-            const aiCriteriaSection = document.getElementById('course-ai-criteria-section');
-            if (syllabusSection)   syllabusSection.style.display   = currentRole === 'prof' ? 'block' : 'none';
-            if (aiCriteriaSection) aiCriteriaSection.style.display = currentRole === 'prof' ? 'block' : 'none';
+            const syllabusSection        = document.getElementById('syllabus-upload-section');
+            const aiCriteriaSection      = document.getElementById('course-ai-criteria-section');
+            const semesterFeedbackSection = document.getElementById('semester-feedback-section');
+            if (syllabusSection)         syllabusSection.style.display         = currentRole === 'prof' ? 'block' : 'none';
+            if (aiCriteriaSection)       aiCriteriaSection.style.display       = currentRole === 'prof' ? 'block' : 'none';
+            if (semesterFeedbackSection) semesterFeedbackSection.style.display = currentRole === 'prof' ? 'block' : 'none';
 
             // 학생용 버튼 표시
             const btnCreate = document.getElementById('btn-create-group');

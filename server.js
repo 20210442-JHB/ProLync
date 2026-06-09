@@ -727,4 +727,86 @@ app.delete('/api/reports/:week/reply/:replyId/prof-reply/:profReplyId', async (r
     } catch (err) { res.status(500).send(err.message); }
 });
 
+// ── 학기 마무리 교수자 AI 피드백 ──────────────────────────────────────────────
+
+app.get('/api/courses/:courseId/semester-feedback', async (req, res) => {
+    try {
+        const { courseId } = req.params;
+
+        const [course, groups, reports, criterias] = await Promise.all([
+            Course.findById(courseId),
+            Group.find({ courseId }),
+            Report.find({ courseId }).sort({ week: 1 }),
+            Criteria.find({ courseId })
+        ]);
+
+        if (!course) return res.status(404).json({ message: '과목을 찾을 수 없습니다.' });
+
+        // 조별 진행 현황 요약
+        const milestones = course.syllabusAnalysis?.milestones || [];
+        const milestoneCount = milestones.length || 5;
+        const groupSummary = groups.map(g => {
+            const progress = milestoneCount > 0
+                ? Math.round((g.currentMilestoneIdx / milestoneCount) * 100)
+                : 0;
+            return `- ${g.name}: 마일스톤 ${g.currentMilestoneIdx}/${milestoneCount} 완료 (${progress}%), 상태: ${g.milestoneStatus}, 팀원 ${g.members.length}명`;
+        }).join('\n') || '등록된 조 없음';
+
+        // 보고서 제출 현황
+        const reportSummary = reports.map(r =>
+            `[${r.week}주차] "${r.title}" — AI피드백: ${r.aiFeedback ? r.aiFeedback.slice(0, 80) + '...' : '없음'} / 학생코멘트 ${r.studentReplies?.length || 0}건`
+        ).join('\n') || '제출된 보고서 없음';
+
+        // 평가 기준 자료 현황
+        const criteriaWeeks = [...new Set(criterias.map(c => c.week))].sort((a, b) => a - b);
+        const criteriaSummary = criteriaWeeks.length > 0
+            ? `${criteriaWeeks.join(', ')}주차 기준 자료 등록됨 (총 ${criterias.length}개)`
+            : '등록된 기준 자료 없음';
+
+        const context = `
+과목명: ${course.title}
+전체 주차: ${course.syllabusAnalysis?.weekCount || '미설정'}주
+등록 학생 수: ${course.enrolledStudents?.length || 0}명
+조 수: ${groups.length}개
+
+[조별 마일스톤 진행 현황]
+${groupSummary}
+
+[주차별 보고서 및 AI 피드백 현황]
+${reportSummary}
+
+[평가 기준 자료 현황]
+${criteriaSummary}
+`.trim();
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                {
+                    role: 'system',
+                    content: `당신은 대학 교육 전문가입니다. 한 학기 수업 운영 데이터를 바탕으로 교수자에게 다음 학기 개선 방향을 제안해주세요.
+다음 항목을 포함하여 구체적이고 실질적인 피드백을 작성하세요:
+1. 이번 학기 전반적인 운영 평가 (2~3줄)
+2. 조별 진행 관리 측면 개선점
+3. 보고서·피드백 운영 측면 개선점
+4. 평가 기준 및 루브릭 측면 개선점
+5. 다음 학기를 위한 핵심 제안 3가지 (bullet point)
+전문적이되 따뜻한 어조로 작성해주세요.`
+                },
+                {
+                    role: 'user',
+                    content: `다음은 이번 학기 수업 운영 데이터입니다:\n\n${context}`
+                }
+            ],
+            max_tokens: 1500,
+            temperature: 0.5
+        });
+
+        res.json({ feedback: completion.choices[0].message.content });
+    } catch (err) {
+        console.error('[SemesterFeedback]', err.message);
+        res.status(500).json({ message: `서버 오류: ${err.message}` });
+    }
+});
+
 app.listen(PORT, () => console.log(`서버가 http://localhost:${PORT} 에서 실행 중입니다.`));
