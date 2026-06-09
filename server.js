@@ -37,13 +37,11 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
+    .then(async () => {
         console.log('개인 클라우드 MongoDB Connected...');
-        mongoose.connection.once('open', async () => {
-            try {
-                await mongoose.connection.db.collection('criterias').dropIndex('week_1');
-            } catch { /* 이미 없으면 무시 */ }
-        });
+        try {
+            await mongoose.connection.db.collection('criterias').dropIndex('week_1');
+        } catch { /* 이미 없으면 무시 */ }
     })
     .catch(err => { console.error('!!! MongoDB 연결 실패 !!!', err); });
 
