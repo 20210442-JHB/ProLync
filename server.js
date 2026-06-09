@@ -518,9 +518,9 @@ app.post('/api/upload-criteria/:week', upload.single('file'), async (req, res) =
 
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         const { courseId } = req.body;
-        const filter = { week: weekNum, ...(courseId ? { courseId } : {}) };
-        const criteriaData = { week: weekNum, fileName: safeFileName, extractedText, updatedAt: new Date(), ...(courseId ? { courseId } : {}) };
-        const criteria = await Criteria.findOneAndUpdate(filter, criteriaData, { upsert: true, new: true });
+        const criteriaData = { week: weekNum, fileName: safeFileName, extractedText, updatedAt: new Date() };
+        if (courseId) criteriaData.courseId = courseId;
+        const criteria = await new Criteria(criteriaData).save();
         res.json({ message: "성공적으로 파일을 학습했습니다.", criteria });
     } catch (err) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
